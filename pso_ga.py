@@ -263,7 +263,7 @@ def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga):
     ws.cell(8, 1).value = 'min'
     ws.cell(9, 1).value = 'max'
 
-    print_array_to_excel(genfit, (5,2), ws=ws, axis=1)
+    print_array_to_excel(genfit, (5, 2), ws=ws, axis=1)
     print_array_to_excel(avgfit, (6, 2), ws=ws, axis=1)
     print_array_to_excel(stdfit, (7, 2), ws=ws, axis=1)
     print_array_to_excel(minfit, (8, 2), ws=ws, axis=1)
