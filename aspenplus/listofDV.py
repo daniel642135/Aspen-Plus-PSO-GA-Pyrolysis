@@ -1,7 +1,7 @@
 
 # dechlorination reactor
 # input stream values
-pwastemassflow = aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC")
+pwastemassflow = aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value
 n2massflow = aspen.Tree.FindNode(r"\Data\Streams\N2\Input\TOTAL\MIXED")
 # reaction kinetics
 coefpvc = aspen.Tree.FindNode(r"\Data\Blocks\DECH\Input\COEF\1\PVC NC")
