@@ -39,82 +39,172 @@ import math
 
 
 #corr is boolean
-def vesselcost(L, ID, density, Po, To, corr):
+class PYRO:
+    def __init__(self, aspen, CEindex):
+        self.aspen = aspen
+        self.CEindex = CEindex
 
-    if Po <= 5:
-        Pd = 10
-    elif Po <= 1000:
-        Pd = math.exp(0.60608 + 0.91615*math.log(Po)+0.0015655*(math.log(Po))**2)
-    else:
-        Pd = 1.1*Po
+    def solve_pyro(self, residencetime, reactortemp)
+        #DV
+        self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\TEMP").Value = reactortemp
+        self.reactortemp = reactortemp
+        self.residencetime = residencetime
 
-    Td = To + 50 # temperature is in oF
+        #to determine vessel sizing
+        N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06
+        pwastevolflow = aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 926.4
+        voidfraction = N2volflow / (N2volflow + pwastevolflow)
+        reactorvol = N2volflow*(self.residencetime/60)/voidfraction
 
-    if corr == False:
-        if Td <= 650:
-            S = 13750 #Carbon steel SA-285
-            Fm = 1
-        elif Td <= 750:
-            S = 15000 #low alloy carbon steel SA387B
-            Fm = 1.2
-        elif Td <= 800:
-            S = 14750
-            Fm = 1.2
-        elif Td <= 850:
-            S = 14200
-            Fm = 1.2
-        elif Td <= 900:
-            S = 13100
-            Fm = 1.2
+        #assuming 1:4 reactor size
+        self.ID = (reactorvol / (math.pi))**(1/3)
+        self.L = ID*4
+
+        self.n2fluidheaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Output\QNET").Value
+
+
+    def vesselcost(self):  #corr is boolean
+
+        Po = 0
+        To = self.reactortemp
+        corr = False
+        L = self.L
+        ID = self.ID
+        CEindex = self.CEindex
+
+        if Po <= 5:
+            Pd = 10
+        elif Po <= 1000:
+            Pd = math.exp(0.60608 + 0.91615*math.log(Po)+0.0015655*(math.log(Po))**2)
         else:
-            S = 20000 #SS316 max temp is 1500 oF
+            Pd = 1.1*Po
+
+        Td = To + 50 # temperature is in oF
+
+        if corr == False:
+            if Td <= 650:
+                S = 13750 #Carbon steel SA-285
+                Fm = 1
+                density = 0.284
+            elif Td <= 750:
+                S = 15000 #low alloy carbon steel SA387B
+                Fm = 1.2
+                density = 0.284
+            elif Td <= 800:
+                S = 14750
+                Fm = 1.2
+                density = 0.284
+            elif Td <= 850:
+                S = 14200
+                Fm = 1.2
+                density = 0.284
+            elif Td <= 900:
+                S = 13100
+                Fm = 1.2
+                density = 0.284
+            else:
+                S = 20000 #SS316 max temp is 1500 oF
+                Fm = 2.1
+                density = 0.289
+        else:
+            S = 16700 #SS316L
             Fm = 2.1
-    else:
-        S = 16700 #SS316L
-        Fm = 2.1
+            density = 0.289
 
-    E = 0.85
-    tp = Pd*ID/(2*S*E-1.2*Pd)
-    if tp > 1.25:
-        E = 1
-    tp = Pd * ID / (2 * S * E - 1.2 * Pd)
+        E = 0.85
+        tp = Pd*ID/(2*S*E-1.2*Pd)
+        if tp > 1.25:
+            E = 1
+        tp = Pd * ID / (2 * S * E - 1.2 * Pd)
 
-    if ID < 48:
-        if tp < 0.25:
-            tp = 0.25
-    else:
-        ID2 = ID - 48
-        ID2 = ID2 / 24
-        n2 = math.ceil(ID2)
-        tpmin = n2 * (1 / 16) + (1 / 4)
-        if tp < tpmin:
-            tp = tpmin
+        if ID < 48:
+            if tp < 0.25:
+                tp = 0.25
+        else:
+            ID2 = ID - 48
+            ID2 = ID2 / 24
+            n2 = math.ceil(ID2)
+            tpmin = n2 * (1 / 16) + (1 / 4)
+            if tp < tpmin:
+                tp = tpmin
 
-    Do = ID + 2*1.25
-    tw = (0.22*(Do + 18)*L**2)/(S*(Do**2))
-    tpbtm = tp + tw
-    tv = (tpbtm + tp)/2
-    ts = tv + 0.125
-    if ts <= 0.5:
-        n = ts/0.0625
-        n = math.ceil(n)
-        ts = n*0.0625
-    elif ts <= 2:
-        n = ts/0.125
-        n = math.ceil(n)
-        ts = n*0.125
-    elif ts <= 3:
-        n = ts/0.25
-        n = math.ceil(n)
-        ts = n*0.25
+        Do = ID + 2*1.25
+        tw = (0.22*(Do + 18)*L**2)/(S*(Do**2))
+        tpbtm = tp + tw
+        tv = (tpbtm + tp)/2
+        ts = tv + 0.125
+        if ts <= 0.5:
+            n = ts/0.0625
+            n = math.ceil(n)
+            ts = n*0.0625
+        elif ts <= 2:
+            n = ts/0.125
+            n = math.ceil(n)
+            ts = n*0.125
+        elif ts <= 3:
+            n = ts/0.25
+            n = math.ceil(n)
+            ts = n*0.25
 
-    W = math.pi*(ID + ts)*(L + 0.8*ID)*ts*density
-    Cv = math.exp(7.1390 + 0.18255*(math.log(W))+0.02297*(math.log(W))**2)   #CE index = 567 (2013)  # 4200< W < 1,000,000 lb
-    Cpl = 410 * ((ID/12)**0.7396) * ((L/12)**0.70684)   # 3 < ID < 21 ft and 12 < L < 40 ft
-    Cp = Fm*Cv + Cpl
-    print(Cp)
-    return
+        W = math.pi*(ID + ts)*(L + 0.8*ID)*ts*density
+        Cv = math.exp(7.1390 + 0.18255*(math.log(W))+0.02297*(math.log(W))**2)   #CE index = 567 (2013)  # 4200< W < 1,000,000 lb
+        Cpl = 410 * ((ID/12)**0.7396) * ((L/12)**0.70684)   # 3 < ID < 21 ft and 12 < L < 40 ft
+        Cp = Fm*Cv + Cpl
+        Cp = Cp/567 * CEindex
+        self.Cbm = Cp * 4.16
 
-vesselcost(L = 409, ID = 136, density = 0.284, Po = 0, To = 932, corr = False)
 
+    #vesselcost(L = 409, ID = 136, density = 0.284, Po = 0, To = 932, corr = False)
+
+    def pyro_totalannualcost(self):
+        cost_of_heating = 0.10 * abs(self.n2fluidheaterduty) * 0.000277778  # cost of heating per hour  # will need to get a better one
+        self.annualcost = (self.Cbm/10) + (cost_of_heating*8160)
+
+
+    def pyro_result(self):
+
+        # [LDPE, HDPE, PP, PET, PS, PA]
+
+        Ea = [340.8, 445.1, 220, 214, 136.4, 217]
+        A = [5.73*(10**23), 7.5536*(10**30), 1.1482*(10**15), 1.5849*(10**15), 9.66*(10**9), 7.9433*(10**14)]
+        k = []
+        X = []
+        for i in range(5):
+            k[i] = A[i]*math.exp(-Ea[i]*(10**3)/(8.314*(self.reactortemp+273.15))
+            X[i] = 1-math.exp(-k[i]*self.residencetime)
+
+        totalconversion = 0.253*X[0] + 0.486*X[1] + 0.160*X[2] + 0.010*X[3] + 0.081*X[4] + 0.008*X[5]
+
+        objective = totalconversion/self.annualcost
+        return totalconversion, objective
+
+    def optimisepyrolysis():
+        aspen = init_aspen()
+        pyrolysis = PYRO(aspen)
+        b_temp = [350, 520]
+        b_residencetime = [2, 4]
+        p_store = [b_temp, b_residencetime]
+
+        params = {'c1': 1.5, 'c2': 1.5, 'wmin': 0.4, 'wmax': 0.9,
+                  'ga_iter_min': 5, 'ga_iter_max': 20, 'iter_gamma': 10,
+                  'ga_num_min': 10, 'ga_num_max': 20, 'num_beta': 15,
+                  'tourn_size': 3, 'cxpd': 0.5, 'mutpd': 0.05, 'indpd': 0.5, 'eta': 0.5,
+                  'pso_iter': pso_gen, 'swarm_size': 50}
+
+        pmin = [x[0] for x in p_store]
+        pmax = [x[1] for x in p_store]
+
+        smin = [abs(x - y) * 0.01 for x, y in zip(pmin, pmax)]
+        smax = [abs(x - y) * 0.5 for x, y in zip(pmin, pmax)]
+
+        def func(individual):
+            nonlocal pyrolysis
+            inlettemp, residencetime = individual
+            solvepyro(residencetime = residencetime, reactortemp = inlettemp)
+            return pyro_result()
+
+        pop, logbook, best = pso_ga(func=func, pmin=pmin, pmax=pmax,
+                                    smin=smin, smax=smax,
+                                    int_idx=None, params=params, ga=ga)
+        return best
 
