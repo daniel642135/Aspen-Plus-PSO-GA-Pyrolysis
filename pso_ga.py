@@ -106,7 +106,7 @@ def ga_hybrid_gaussianmutate(individual, sigma, low, up, indpb):
 def eval_func(part):
     return (sum(part),)
 
-def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga):
+def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga, DV):
     # Setting params
     c1, c2, wmin, wmax, ga_iter_min, ga_iter_max, iter_gamma, ga_num_min, ga_num_max, num_beta,\
     tourn_size, cxpb, mutpb, indpd, eta,\
@@ -242,6 +242,35 @@ def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga):
 
     print(best.fitness.values)
 
+    # Printing to excel
+    write_excel = create_excel_file('./results/pso_ga_results.xlsx')
+    wb = openpyxl.load_workbook(write_excel)
+    ws = wb[wb.sheetnames[-1]]
+
+    ws.cell(1, 1).value = 'Optimal Decision Values'
+    print_array_to_excel(DV, (2, 1), ws=ws, axis=1)
+    print_array_to_excel(best, (3, 1), ws=ws, axis=1)
+
+    genfit = logbook.select("gen")
+    avgfit = logbook.select("avg")
+    stdfit = logbook.select("std")
+    minfit = logbook.select("min")
+    maxfit = logbook.select("max")
+
+    ws.cell(5, 1).value = 'gen'
+    ws.cell(6, 1).value = 'avg'
+    ws.cell(7, 1).value = 'std'
+    ws.cell(8, 1).value = 'min'
+    ws.cell(9, 1).value = 'max'
+
+    print_array_to_excel(genfit, (5, 2), ws=ws, axis=1)
+    print_array_to_excel(avgfit, (6, 2), ws=ws, axis=1)
+    print_array_to_excel(stdfit, (7, 2), ws=ws, axis=1)
+    print_array_to_excel(minfit, (8, 2), ws=ws, axis=1)
+    print_array_to_excel(maxfit, (9, 2), ws=ws, axis=1)
+
+    wb.save(write_excel)
+    return
 
     return pop, logbook, best
 

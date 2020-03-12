@@ -40,19 +40,19 @@ import math
 
 #corr is boolean
 class PYRO:
-    def __init__(self, aspen, CEindex):
+    def __init__(self, aspen):
         self.aspen = aspen
-        self.CEindex = CEindex
+        self.CEindex = 600 # Find value
+        self.reactortemp = self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\TEMP").Value
 
     def solve_pyro(self, residencetime, reactortemp)
         #DV
-        self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\TEMP").Value = reactortemp
         self.reactortemp = reactortemp
         self.residencetime = residencetime
 
         #to determine vessel sizing
         N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06
-        pwastevolflow = aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 926.4
+        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 926.4
         voidfraction = N2volflow / (N2volflow + pwastevolflow)
         reactorvol = N2volflow*(self.residencetime/60)/voidfraction
 
@@ -81,7 +81,7 @@ class PYRO:
 
         Td = To + 50 # temperature is in oF
 
-        if corr == False:
+        if not corr:
             if Td <= 650:
                 S = 13750 #Carbon steel SA-285
                 Fm = 1
@@ -151,15 +151,17 @@ class PYRO:
         Cpl = 410 * ((ID/12)**0.7396) * ((L/12)**0.70684)   # 3 < ID < 21 ft and 12 < L < 40 ft
         Cp = Fm*Cv + Cpl
         Cp = Cp/567 * CEindex
-        self.Cbm = Cp * 4.16
+        Cbm = Cp * 4.16
 
+        return Cbm
 
     #vesselcost(L = 409, ID = 136, density = 0.284, Po = 0, To = 932, corr = False)
 
     def pyro_totalannualcost(self):
         cost_of_heating = 0.10 * abs(self.n2fluidheaterduty) * 0.000277778  # cost of heating per hour  # will need to get a better one
-        self.annualcost = (self.Cbm/10) + (cost_of_heating*8160)
-
+        Cbm = self.vesselcost()
+        annualcost = (Cbm/10) + (cost_of_heating*8160)
+        return annualcost
 
     def pyro_result(self):
 
@@ -170,41 +172,18 @@ class PYRO:
         k = []
         X = []
         for i in range(5):
-            k[i] = A[i]*math.exp(-Ea[i]*(10**3)/(8.314*(self.reactortemp+273.15))
+            k[i] = A[i]*math.exp(-Ea[i]*(10**3)/(8.314*(self.reactortemp+273.15)))
             X[i] = 1-math.exp(-k[i]*self.residencetime)
 
+        annual_cost = self.pyro_totalannualcost()
         totalconversion = 0.253*X[0] + 0.486*X[1] + 0.160*X[2] + 0.010*X[3] + 0.081*X[4] + 0.008*X[5]
 
-        objective = totalconversion/self.annualcost
-        return totalconversion, objective
+        objective = totalconversion / annual_cost
 
-    def optimisepyrolysis():
-        aspen = init_aspen()
-        pyrolysis = PYRO(aspen)
-        b_temp = [350, 520]
-        b_residencetime = [2, 4]
-        p_store = [b_temp, b_residencetime]
+        # Constraint
+        if totalconversion < 0.99:
+            objective = 1e20
+        return objective
 
-        params = {'c1': 1.5, 'c2': 1.5, 'wmin': 0.4, 'wmax': 0.9,
-                  'ga_iter_min': 5, 'ga_iter_max': 20, 'iter_gamma': 10,
-                  'ga_num_min': 10, 'ga_num_max': 20, 'num_beta': 15,
-                  'tourn_size': 3, 'cxpd': 0.5, 'mutpd': 0.05, 'indpd': 0.5, 'eta': 0.5,
-                  'pso_iter': pso_gen, 'swarm_size': 50}
 
-        pmin = [x[0] for x in p_store]
-        pmax = [x[1] for x in p_store]
-
-        smin = [abs(x - y) * 0.01 for x, y in zip(pmin, pmax)]
-        smax = [abs(x - y) * 0.5 for x, y in zip(pmin, pmax)]
-
-        def func(individual):
-            nonlocal pyrolysis
-            inlettemp, residencetime = individual
-            solvepyro(residencetime = residencetime, reactortemp = inlettemp)
-            return pyro_result()
-
-        pop, logbook, best = pso_ga(func=func, pmin=pmin, pmax=pmax,
-                                    smin=smin, smax=smax,
-                                    int_idx=None, params=params, ga=ga)
-        return best
 
