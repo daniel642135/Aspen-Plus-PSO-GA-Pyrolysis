@@ -31,7 +31,7 @@ def optimisepyrolysis(pso_gen, ga):
     def func(individual):
         nonlocal pyrolysis
         inlettemp, residencetime = individual
-        pyrolysis.solvepyro(reactortemp=inlettemp, residencetime=residencetime, )
+        pyrolysis.solve_pyro(reactortemp=inlettemp, residencetime=residencetime, )
         return (pyrolysis.pyro_result(),)
 
     pop, logbook, best = pso_ga(func=func, pmin=pmin, pmax=pmax,
@@ -39,4 +39,4 @@ def optimisepyrolysis(pso_gen, ga):
                                 int_idx=None, params=params, ga=ga, DV=DV)
     return best
 
-optimisepyrolysis(pso_gen=5, ga=True)
+optimisepyrolysis(pso_gen=1, ga=True)

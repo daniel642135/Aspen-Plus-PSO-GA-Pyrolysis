@@ -45,10 +45,12 @@ class PYRO:
         self.CEindex = 600 # Find value
         self.reactortemp = self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\TEMP").Value
 
-    def solve_pyro(self, residencetime, reactortemp)
+    def solve_pyro(self, residencetime, reactortemp):
         #DV
         self.reactortemp = reactortemp
         self.residencetime = residencetime
+
+        self.aspen.Engine.Run2()
 
         #to determine vessel sizing
         N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06
@@ -58,7 +60,7 @@ class PYRO:
 
         #assuming 1:4 reactor size
         self.ID = (reactorvol / (math.pi))**(1/3)
-        self.L = ID*4
+        self.L = self.ID*4
 
         self.n2fluidheaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Output\QNET").Value
 
@@ -171,14 +173,14 @@ class PYRO:
         A = [5.73*(10**23), 7.5536*(10**30), 1.1482*(10**15), 1.5849*(10**15), 9.66*(10**9), 7.9433*(10**14)]
         k = []
         X = []
-        for i in range(5):
-            k[i] = A[i]*math.exp(-Ea[i]*(10**3)/(8.314*(self.reactortemp+273.15)))
-            X[i] = 1-math.exp(-k[i]*self.residencetime)
+        for i in range(6):
+            k.append(A[i]*math.exp(-Ea[i]*(10**3)/(8.314*(self.reactortemp+273.15))))
+            X.append(1-math.exp(-k[i]*self.residencetime))
 
         annual_cost = self.pyro_totalannualcost()
         totalconversion = 0.253*X[0] + 0.486*X[1] + 0.160*X[2] + 0.010*X[3] + 0.081*X[4] + 0.008*X[5]
 
-        objective = totalconversion / annual_cost
+        objective = annual_cost/ totalconversion
 
         # Constraint
         if totalconversion < 0.99:

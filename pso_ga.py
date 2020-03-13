@@ -5,13 +5,13 @@ from deap import base
 from deap import benchmarks
 from deap import creator
 from deap import tools
-from own_package.others import create_excel_file, print_df_to_excel, print_array_to_excel
+from others import create_excel_file, print_df_to_excel, print_array_to_excel
 import openpyxl
-import pickle
+#import pickle
 import pandas as pd
 from deap.algorithms import varAnd
 from deap.tools.selection import selRandom
-import time
+#import time
 
 def generate_part(dim, pmin, pmax, smin, smax, int_idx):
     int_mask = [0]*dim
