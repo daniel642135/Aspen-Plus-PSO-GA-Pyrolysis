@@ -1,5 +1,6 @@
 from aspenplus.aspen_link import init_aspen
 import math
+import time
 # def test():
 #     aspen = init_aspen()
 #     temp = aspen.Tree.FindNode(r"\Data\Blocks\PREHEAT\Input\TEMP").Value
@@ -45,12 +46,16 @@ class PYRO:
         self.CEindex = 600 # Find value
         self.reactortemp = self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\TEMP").Value
 
+
+
     def solve_pyro(self, residencetime, reactortemp):
         #DV
         self.reactortemp = reactortemp
+        self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Input\TEMP").Value = reactortemp
         self.residencetime = residencetime
 
         self.aspen.Engine.Run2()
+
 
         #to determine vessel sizing
         N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06
@@ -63,6 +68,8 @@ class PYRO:
         self.L = self.ID*4
 
         self.n2fluidheaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Output\QNET").Value
+        print(reactortemp)
+        print(self.n2fluidheaterduty)
 
 
     def vesselcost(self):  #corr is boolean

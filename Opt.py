@@ -26,7 +26,7 @@ def optimisepyrolysis(pso_gen, ga):
     smin = [abs(x - y) * 0.01 for x, y in zip(pmin, pmax)]
     smax = [abs(x - y) * 0.5 for x, y in zip(pmin, pmax)]
 
-    DV = ['reactortemp','residencetime']
+    dv = ['reactortemp','residencetime']
 
     def func(individual):
         nonlocal pyrolysis
@@ -36,7 +36,7 @@ def optimisepyrolysis(pso_gen, ga):
 
     pop, logbook, best = pso_ga(func=func, pmin=pmin, pmax=pmax,
                                 smin=smin, smax=smax,
-                                int_idx=None, params=params, ga=ga, DV=DV)
+                                int_idx=None, params=params, ga=ga, dv=dv)
     return best
 
 optimisepyrolysis(pso_gen=1, ga=True)

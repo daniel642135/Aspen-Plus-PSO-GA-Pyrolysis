@@ -106,7 +106,7 @@ def ga_hybrid_gaussianmutate(individual, sigma, low, up, indpb):
 def eval_func(part):
     return (sum(part),)
 
-def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga, DV):
+def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga, dv):
     # Setting params
     c1, c2, wmin, wmax, ga_iter_min, ga_iter_max, iter_gamma, ga_num_min, ga_num_max, num_beta,\
     tourn_size, cxpb, mutpb, indpd, eta,\
@@ -248,7 +248,7 @@ def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga, DV):
     ws = wb[wb.sheetnames[-1]]
 
     ws.cell(1, 1).value = 'Optimal Decision Values'
-    print_array_to_excel(DV, (2, 1), ws=ws, axis=1)
+    print_array_to_excel(dv, (2, 1), ws=ws, axis=1)
     print_array_to_excel(best, (3, 1), ws=ws, axis=1)
 
     genfit = logbook.select("gen")
@@ -270,7 +270,7 @@ def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga, DV):
     print_array_to_excel(maxfit, (9, 2), ws=ws, axis=1)
 
     wb.save(write_excel)
-    return
+
 
     return pop, logbook, best
 
@@ -287,4 +287,4 @@ if __name__ == "__main__":
     smax = [abs(x-y)*0.5 for x,y in zip(pmin, pmax)]
     pso_ga(func=benchmarks.rosenbrock,pmin=pmin,pmax=pmax,
            smin=smin, smax=smax,
-           int_idx=[1], params=params, ga=True)
+           int_idx=None, params=params, ga=True)
