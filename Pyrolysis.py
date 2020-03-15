@@ -44,7 +44,7 @@ class PYRO:
     def __init__(self, aspen):
         self.aspen = aspen
         self.CEindex = 600 # Find value
-        self.reactortemp = self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\TEMP").Value
+        self.reactortemp = self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER1\Input\TEMP").Value
 
 
 
