@@ -33,10 +33,10 @@ class HCL:
 
         #determine N number of stages
         V = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\VOLFLMX2").Value #l/min
-        molfracofHClinV = 0.1
+        molfracofHClinV = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\MOLEFRAC\MIXED\HCL").Value
 
         # need to get the correlation for K in terms of temp and pressure
-        K = 100 #distribution coefficient (this should be temperature and pressure dependent)
+        K = self.aspen.Tree.FindNode(r"\Data\Blocks\SCRUB\Output\Output\B_K\5\HCL").Value  #distribution coefficient (this should be temperature and pressure dependent)
 
 
         Liquidmin = K*V*(1-molfracofHClinV)   #(1- fiak) fraction of the key component in the feed gas that is to be absorbed
@@ -56,14 +56,14 @@ class HCL:
         self.HClmolfractarget = self.HCLmolfrac
 
         #determine L
-        trayheight = 30 #in (need to retrieve from aspen on the typical tray height)
-        trayspacing = 24 #in
+        trayheight = 24 #in typical value from aspen
+        trayspacing = 24 #in typical value from aspen
         self.L = self.numofstage*trayheight + (self.numofstage-1)*trayspacing
 
         #determine ID
-        G = 100  # need to get the total volumetric flow rate gas stream entering the scrubber
-        densityofgas = 100 #need to get the density of the gas flow
-        densityofliquid = 100 #need to get the density of the liquid flow
+        G = self.aspen.Tree.FindNode(r"\Data\Streams\NAOHIN\Output\VOLFLMX2").Value  #l/min
+        densityofgas = 100 #g/cm3
+        densityofliquid = 100 #g/cm3
         f = 0.75
         surfacetension = 100 #get surface tension of (check) in dyne/cm
 
