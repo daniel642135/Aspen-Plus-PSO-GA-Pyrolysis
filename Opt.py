@@ -74,5 +74,5 @@ def optimisepyrolysis(pso_gen, ga):
 #                                 int_idx=None, params=params, ga=ga, dv=dv)
 #     return best
 
-optimisepyrolysis(pso_gen=30, ga=True)
+optimisepyrolysis(pso_gen=50, ga=True)
 # optimisehclscrubber(pso_gen=1, ga=True)

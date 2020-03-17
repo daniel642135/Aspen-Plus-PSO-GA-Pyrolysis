@@ -32,7 +32,7 @@ class HCL:
         self.n2massflow = N2flow
 
         #determine N number of stages
-        V = 100 #mass flow rate of vapour stream
+        V = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\VOLFLMX2").Value #l/min
         molfracofHClinV = 0.1
 
         # need to get the correlation for K in terms of temp and pressure

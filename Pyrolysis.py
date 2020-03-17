@@ -49,6 +49,7 @@ class PYRO:
 
 
     def solve_pyro(self, residencetime, reactortemp): #residencetime in min, reactortemp in oC
+        self.aspen.Engine.Reinit()  # reset the simulation
         #DV
         self.reactortemp = reactortemp
         self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Input\TEMP").Value = reactortemp #need to change the heater temp, this will affect the duty required
@@ -73,7 +74,7 @@ class PYRO:
         self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\5").Value = totalconversion
         self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\6").Value = totalconversion
 
-        self.aspen.Engine.Reinit() #reset the simulation
+
         self.aspen.Engine.Run2()
 
         #to determine vessel sizing
