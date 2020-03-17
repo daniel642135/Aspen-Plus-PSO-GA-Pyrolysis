@@ -43,7 +43,7 @@ import time
 class PYRO:
     def __init__(self, aspen):
         self.aspen = aspen
-        self.CEindex = 600 # Find value
+        self.CEindex = 603.1 #2018 CE index
         self.reactortemp = self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER1\Input\TEMP").Value
 
 
@@ -84,8 +84,8 @@ class PYRO:
         reactorvol = N2volflow*(self.residencetime/60)/voidfraction #m3
 
         #assuming 1:4 reactor size
-        self.ID = (reactorvol / (math.pi))**(1/3)
-        self.L = self.ID*4
+        self.ID = (reactorvol / (math.pi))**(1/3) #in
+        self.L = self.ID*4 #in
 
         self.n2fluidheaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Output\QNET").Value #cal/s
         #print(reactortemp)

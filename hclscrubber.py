@@ -4,7 +4,7 @@ import math
 class HCL:
     def __init__(self, aspen):
         self.aspen = aspen
-        self.CEindex = 600 # Find value
+        self.CEindex = 603.1 #2018 CE index
 
         #DVs
         self.coolertemp = self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER1\Input\TEMP").Value
@@ -58,24 +58,24 @@ class HCL:
         #determine L
         trayheight = 24 #in typical value from aspen
         trayspacing = 24 #in typical value from aspen
-        self.L = self.numofstage*trayheight + (self.numofstage-1)*trayspacing
+        self.L = self.numofstage*trayheight + (self.numofstage-1)*trayspacing #in
 
         #determine ID
-        G = self.aspen.Tree.FindNode(r"\Data\Streams\NAOHIN\Output\VOLFLMX2").Value  #l/min
-        densityofgas = 100 #g/cm3
-        densityofliquid = 100 #g/cm3
+        G = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\MASSFLMX_GAS").Value  #kg/hr
+        densityofgas =self.aspen.Tree.FindNode(r"\Data\Streams\NAOHIN\Output\RHOMX_MASS\MIXED").Value #g/cm3
+        densityofliquid =self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\RHOMX_MASS\MIXED").Value #g/cm3
         f = 0.75
-        surfacetension = 100 #get surface tension of (check) in dyne/cm
+        surfacetension = 58.85 #surface tension of water (major component) n dyne/cm
 
-
-        Csb = 100 #to get the correlation graph
+        Flg = (Liquid/G)*(densityofgas/densityofliquid)**0.5
+        Csb = -0.0717*math.log(Flg, 10)**2 - 0.273*math.log(Flg, 10) + 0.1299  #ft/s
         Fst = (surfacetension/20)**0.2
         Ff = 1
         Fha = 1 #considering that Ah/Aa > 0.1
 
         C = Csb*Fst*Ff*Fha
-        Uf = C*((densityofliquid - densityofgas)/densityofgas)**0.5
-        self.ID = (4*G)/(f*Uf*math.pi*(1-0.1)*densityofgas)
+        Uf = C*((densityofliquid - densityofgas)/densityofgas)**0.5  #ft/s
+        self.ID = ((4*G)/(f*Uf*math.pi*(1-0.1)*densityofgas)*1000*(1/3600)*(1/12)*0.0610237)**0.5 #convert to in
 
 
     def vesselcost(self):  # corr is boolean
@@ -182,9 +182,9 @@ class HCL:
         return Cbm
 
     def hcl_totalannualcost(self):
-        cost_of_cooling = 0.10 * abs(self.hclscrubbercoolerduty) * 0.000277778  # cost of cooling per hour  # will need to get a better one
+        cost_of_cooling = abs(self.hclscrubbercoolerduty) * 4.184 * 3600* 0.070  * 567/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
         Cbm = self.vesselcost()
-        annualcost = (Cbm/10) + (cost_of_cooling*8160)
+        annualcost = (Cbm/3) + (cost_of_cooling*8160) #consider per year
         return annualcost
 
     def hcl_result(self):
