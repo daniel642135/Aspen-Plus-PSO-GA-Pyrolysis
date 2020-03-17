@@ -1,5 +1,5 @@
 import math
-from scipy.optimize import fsolve
+#from scipy.optimize import fsolve
 
 class HCL:
     def __init__(self, aspen):

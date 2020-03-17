@@ -48,28 +48,53 @@ class PYRO:
 
 
 
-    def solve_pyro(self, residencetime, reactortemp):
+    def solve_pyro(self, residencetime, reactortemp): #residencetime in min, reactortemp in oC
         #DV
         self.reactortemp = reactortemp
-        self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Input\TEMP").Value = reactortemp
+        self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Input\TEMP").Value = reactortemp #need to change the heater temp, this will affect the duty required
         self.residencetime = residencetime
 
+        # To determine the conversion based on DVs (residencetime and reactortemp)
+        # [LDPE, HDPE, PP, PET, PS, PA]
+        Ea = [340.8, 445.1, 220, 214, 136.4, 217]
+        A = [5.73 * (10 ** 23), 7.5536 * (10 ** 30), 1.1482 * (10 ** 15), 1.5849 * (10 ** 15), 9.66 * (10 ** 9),
+             7.9433 * (10 ** 14)]
+        k = []
+        X = []
+        for i in range(6):
+            k.append(A[i] * math.exp(-Ea[i] * (10 ** 3) / (8.314 * (self.reactortemp + 273.15))))
+            X.append(1 - math.exp(-k[i] * self.residencetime))
+
+        totalconversion = 0.253 * X[0] + 0.486 * X[1] + 0.160 * X[2] + 0.010 * X[3] + 0.081 * X[4] + 0.008 * X[5]
+        self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\1").Value = totalconversion
+        self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\2").Value = totalconversion
+        self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\3").Value = totalconversion
+        self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\4").Value = totalconversion
+        self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\5").Value = totalconversion
+        self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\6").Value = totalconversion
+
+        self.aspen.Engine.Reinit() #reset the simulation
         self.aspen.Engine.Run2()
 
-
         #to determine vessel sizing
-        N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06
-        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 926.4
+        N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06 # (l/min to m3/h)this value should be fixed due to the determination of fluidizing flow based on the fixed input plastic waste
+        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 926.4 #(kg/h to m3/h)
         voidfraction = N2volflow / (N2volflow + pwastevolflow)
-        reactorvol = N2volflow*(self.residencetime/60)/voidfraction
+        reactorvol = N2volflow*(self.residencetime/60)/voidfraction #m3
 
         #assuming 1:4 reactor size
         self.ID = (reactorvol / (math.pi))**(1/3)
         self.L = self.ID*4
 
-        self.n2fluidheaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Output\QNET").Value
-        print(reactortemp)
-        print(self.n2fluidheaterduty)
+        self.n2fluidheaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Output\QNET").Value #cal/s
+        #print(reactortemp)
+        #print(self.n2fluidheaterduty)
+
+        #determine light and heavy flow
+        self.light = self.aspen.Tree.FindNode(r"\Data\Streams\LIGHT\Output\MASSFLMX\$TOTAL").Value #(kg/h)
+        self.heavy = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVY\Output\MASSFLMX\$TOTAL").Value #(kg/h)
+
+
 
 
     def vesselcost(self):  #corr is boolean
@@ -167,31 +192,20 @@ class PYRO:
     #vesselcost(L = 409, ID = 136, density = 0.284, Po = 0, To = 932, corr = False)
 
     def pyro_totalannualcost(self):
-        cost_of_heating = 0.10 * abs(self.n2fluidheaterduty) * 0.000277778  # cost of heating per hour  # will need to get a better one
+        cost_of_heating = abs(self.n2fluidheaterduty) * 4.184 * 3600* 0.070  * 567/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
         Cbm = self.vesselcost()
-        annualcost = (Cbm/10) + (cost_of_heating*8160)
+        annualcost = (Cbm/3) + (cost_of_heating*8160) #per year, but this would need to be J cost of the entire plant
         return annualcost
 
     def pyro_result(self):
 
-        # [LDPE, HDPE, PP, PET, PS, PA]
-
-        Ea = [340.8, 445.1, 220, 214, 136.4, 217]
-        A = [5.73*(10**23), 7.5536*(10**30), 1.1482*(10**15), 1.5849*(10**15), 9.66*(10**9), 7.9433*(10**14)]
-        k = []
-        X = []
-        for i in range(6):
-            k.append(A[i]*math.exp(-Ea[i]*(10**3)/(8.314*(self.reactortemp+273.15))))
-            X.append(1-math.exp(-k[i]*self.residencetime))
 
         annual_cost = self.pyro_totalannualcost()
-        totalconversion = 0.253*X[0] + 0.486*X[1] + 0.160*X[2] + 0.010*X[3] + 0.081*X[4] + 0.008*X[5]
-
-        objective = annual_cost/ totalconversion
+        totalproductflow = (self.light + self.heavy)
+        objective = annual_cost/totalproductflow
 
         # Constraint
-        if totalconversion < 0.99:
-            objective = 1e20
+
         return objective
 
 
