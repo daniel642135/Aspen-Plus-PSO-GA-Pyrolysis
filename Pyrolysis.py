@@ -84,9 +84,10 @@ class PYRO:
         reactorvol = N2volflow*(self.residencetime/60)/voidfraction #m3
 
         #assuming 1:4 reactor size
-        self.ID = (reactorvol / (math.pi))**(1/3) #in
+        self.ID = (reactorvol / (math.pi))**(1/3) *39.3701 #in
         self.L = self.ID*4 #in
-
+        print("L = "+str(self.L))
+        print("ID = " + str(self.ID))
         self.n2fluidheaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HEATER\Output\QNET").Value #cal/s
         #print(reactortemp)
         #print(self.n2fluidheaterduty)
@@ -94,8 +95,6 @@ class PYRO:
         #determine light and heavy flow
         self.light = self.aspen.Tree.FindNode(r"\Data\Streams\LIGHT\Output\MASSFLMX\$TOTAL").Value #(kg/h)
         self.heavy = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVY\Output\MASSFLMX\$TOTAL").Value #(kg/h)
-
-
 
 
     def vesselcost(self):  #corr is boolean
@@ -193,9 +192,12 @@ class PYRO:
     #vesselcost(L = 409, ID = 136, density = 0.284, Po = 0, To = 932, corr = False)
 
     def pyro_totalannualcost(self):
-        cost_of_heating = abs(self.n2fluidheaterduty) * 4.184 * 3600* 0.070  * 567/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
+        cost_of_heating = abs(self.n2fluidheaterduty) * 0.004184 * 3600* 0.070  * 567/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
         Cbm = self.vesselcost()
+        print("Cbm = " + str(Cbm))
+        print("cost_of_heating = " + str(cost_of_heating))
         annualcost = (Cbm/3) + (cost_of_heating*8160) #per year, but this would need to be J cost of the entire plant
+        print("annualcost = "+str(annualcost))
         return annualcost
 
     def pyro_result(self):
