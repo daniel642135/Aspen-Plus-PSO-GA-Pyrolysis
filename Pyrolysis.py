@@ -79,7 +79,7 @@ class PYRO:
 
         #to determine vessel sizing
         N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06 # (l/min to m3/h)this value should be fixed due to the determination of fluidizing flow based on the fixed input plastic waste
-        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 926.4 #(kg/h to m3/h)
+        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 926.4 #(kg/h to m3/h) #check if this is correct
         voidfraction = N2volflow / (N2volflow + pwastevolflow)
         reactorvol = N2volflow*(self.residencetime/60)/voidfraction #m3
 
@@ -193,6 +193,7 @@ class PYRO:
 
     def pyro_totalannualcost(self):
         cost_of_heating = abs(self.n2fluidheaterduty) * 0.004184 * 3600* 0.070  * 567/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
+        #do I need to consider duty from pyro unit
         Cbm = self.vesselcost()
         print("Cbm = " + str(Cbm))
         print("cost_of_heating = " + str(cost_of_heating))
