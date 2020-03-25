@@ -83,9 +83,8 @@ class HCL:
         # cooling duty
         self.hclscrubbercoolerduty = self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER1\Output\QNET").Value
         #determine L
-        trayheight = 24 #in typical value from aspen
         trayspacing = 24 #in typical value from aspen
-        self.L = self.numofstage*trayheight + (self.numofstage-1)*trayspacing #in
+        self.L = (self.numofstage-1)*trayspacing + 36 #in +36 to account for feed inlet distributor
         print("L = " + str(self.L))
 
         #determine ID
