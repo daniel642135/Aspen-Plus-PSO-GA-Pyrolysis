@@ -110,10 +110,12 @@ class HCL:
         self.ID = ((4*G)/(f*Uf*math.pi*(1-0.1)*densityofgas)*1000*(1/3600)*(1/12)*0.0610237)**0.5 #convert to in
         print("ID = " + str(self.ID))
 
+        #
+
     def vesselcost(self, corr, internal):  # corr is boolean
 
         Po = 0
-        To = self.coolertemp #need to get the outlet temperature because this is exothermic process
+        To = self.aspen.Tree.FindNode(r"\Data\Blocks\SCRUB\Output\BOTTOM_TEMP").Value
         L = self.L
         ID = self.ID
         CEindex = self.CEindex
@@ -214,7 +216,7 @@ class HCL:
         return Cbm
 
     def hcl_totalannualcost(self):
-        cost_of_cooling = abs(self.hclscrubbercoolerduty) * 0.004184 * 3600 * 0.070 * 567/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1 # convert from cal/s to kW/h
+        cost_of_cooling = abs(self.hclscrubbercoolerduty) * 0.004184 * 3600 * 0.070 * self.CEindex/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1 # convert from cal/s to kW/h
         Cbm = self.vesselcost()
         print("Cbm = "+str(Cbm))
         print("Cost of cooling = "+str(cost_of_cooling))
