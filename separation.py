@@ -58,31 +58,49 @@ class SEPARATE:
         self.L2 = L2*39.3701 #convert from m to inch
         self.ID2 = Dv2*39.3701 #convert from m to inch
 
+        #tank separator
+        #consider minimum tank volume design 2.4 m3 and L:D is 1:4
+        self.L3 = 3.6576*39.3701 #convert from m to inch
+        self.ID3 = 0.9144*39.3701 #convert from m to inch
 
         #distillation
-        numofstage = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Input\NSTAGE").Value
-        self.L3 = numofstage*0.6*3.28084*1.3*12 #convert from m to inch
+        self.numofstage = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Input\NSTAGE").Value
+        self.L4 = self.numofstage*0.6*3.28084*1.3*12 #convert from m to inch
 
         operatingtemp = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\BOTTOM_TEMP").Value #oC
         feedmassflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\TOT_MASS_ABS").Value #kg/h
         botmassflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\MASS_B").Value #kg/h
         distmassflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\MASS_D").Value #kg/h
-        refluxratio = 0.15
+        refluxratio = 0.15 #to get from short cut column for the reflux ratio
 
+        vapourmassflow = distmassflow*(1+refluxratio)
+        liquidmassflow = vapourmassflow - distmassflow
+        #vapordensity =
+        #liquiddesnity =
+        surfacetension = 23.05 #dyne/cm
 
+        Flg = (liquidmassflow / vapourmassflow) * ((vapordensity / liquiddesnity) ** 0.5)
+        Csb = -0.0717 * math.log(Flg, 10) ** 2 - 0.273 * math.log(Flg, 10) + 0.1299  # ft/s
+        Fst = (surfacetension / 20) ** 0.2
+        Ff = 1
+        Fha = 1  # considering that Ah/Aa > 0.1
+        C = Csb * Fst * Ff * Fha
+        f = 0.8
+        Uf = C * ((liquiddesnity - vapordensity) / vapordensity) ** 0.5  # ft/s
+        A = 0.1 + (Flg-0.1)/9
+        self.ID4 = ((4 * vapourmassflow) / (f * Uf * math.pi * (1 - A) * vapordensity) * 1000 * (1 / 3600) * (1 / 12) * 0.0610237) ** 0.5  # convert to in
 
     def cyclone(self):
-        Cp1 = math.exp(9.227-(0.7892*math.log(self.hotgasin)+(0.08487*(math.log(self.hotgasin))**2)))  #applicable for 200-10^5 cfm
+        Cp1 = math.exp(9.227-(0.7892*math.log(self.hotgasvolflow)+(0.08487*(math.log(self.hotgasvolflow))**2)))  #applicable for 200-10^5 cfm
         return Cp1
 
+    def utilitycost(self):
+        CEindex = self.CEindex
+        Cf = 6 #$/GJ
 
 
 
-    def vesselcost(self, L, ID):  # corr is boolean
-
-        Po = 0
-        To = self.coolertemp #need to get the outlet temperature because this is exothermic process
-        corr = False
+    def vesselcost(self, L, ID, Po, To, corr, internal):  # corr is boolean
         CEindex = self.CEindex
 
         if Po <= 5:
@@ -163,15 +181,18 @@ class SEPARATE:
         Cv = math.exp(7.1390 + 0.18255 * (math.log(W)) + 0.02297 * (math.log(W)) ** 2)  # CE index = 567 (2013)  # 4200< W < 1,000,000 lb
         Cpl = 410 * ((ID / 12) ** 0.7396) * ((L / 12) ** 0.70684)  # 3 < ID < 21 ft and 12 < L < 40 ft
 
-        #to consider for cost of trays
-        Cbt = 468*math.exp(0.1482*(ID/12))   #ID here needs to be in feet
-        if self.numofstage < 20:
-            Fnt = 2.25/(1.0414**self.numofstage)
+        if internal:
+            #to consider for cost of trays
+            Cbt = 468*math.exp(0.1482*(ID/12))   #ID here needs to be in feet
+            if self.numofstage < 20:
+                Fnt = 2.25/(1.0414**self.numofstage)
+            else:
+                Fnt = 1
+            Ftt = 1 # for sieve trays
+            Ftm = 1.401 + 0.0724*(ID/12)    #ID here needs to be in feet
+            Ct = self.numofstage * Fnt * Ftt * Ftm * Cbt
         else:
-            Fnt = 1
-        Ftt = 1 # for sieve trays
-        Ftm = 1.401 + 0.0724*(ID/12)    #ID here needs to be in feet
-        Ct = self.numofstage * Fnt * Ftt * Ftm * Cbt
+            Ct = 0
         Cp = Fm * Cv + Cpl + Ct
         Cp = Cp / 567 * CEindex
         Cbm = Cp * 4.16
@@ -179,5 +200,11 @@ class SEPARATE:
         return Cbm
 
     def totalcost(self):
-        S1capitalcost = self.vesselcost(self.L1, self.ID1)
-        S2capitalcost = self.vesselcost(self.L2, self.ID2)
+        S1capitalcost = self.vesselcost(self.L1, self.ID1, Po=, To=, corr=False, internal=False)
+        S2capitalcost = self.vesselcost(self.L2, self.ID2, Po=, To=, corr=False, internal=False)
+        S3capitalcost = self.vesselcost(self.L3, self.ID3, Po=, To=, corr=False, internal=False)
+        S4capitalcost = self.vesselcost(self.L4, self.ID4, Po=, To=, corr=False, internal=True)
+        cyclonecapticalcost = self.cyclone()
+
+
+

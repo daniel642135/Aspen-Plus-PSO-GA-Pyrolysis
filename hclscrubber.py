@@ -110,11 +110,10 @@ class HCL:
         self.ID = ((4*G)/(f*Uf*math.pi*(1-0.1)*densityofgas)*1000*(1/3600)*(1/12)*0.0610237)**0.5 #convert to in
         print("ID = " + str(self.ID))
 
-    def vesselcost(self):  # corr is boolean
+    def vesselcost(self, corr, internal):  # corr is boolean
 
         Po = 0
         To = self.coolertemp #need to get the outlet temperature because this is exothermic process
-        corr = True
         L = self.L
         ID = self.ID
         CEindex = self.CEindex
@@ -196,16 +195,18 @@ class HCL:
         W = math.pi * (ID + ts) * (L + 0.8 * ID) * ts * density
         Cv = math.exp(7.1390 + 0.18255 * (math.log(W)) + 0.02297 * (math.log(W)) ** 2)  # CE index = 567 (2013)  # 4200< W < 1,000,000 lb
         Cpl = 410 * ((ID / 12) ** 0.7396) * ((L / 12) ** 0.70684)  # 3 < ID < 21 ft and 12 < L < 40 ft
-
-        #to consider for cost of trays
-        Cbt = 468*math.exp(0.1482*(ID/12))   #ID here needs to be in feet
-        if self.numofstage < 20:
-            Fnt = 2.25/(1.0414**self.numofstage)
+        if internal:
+            #to consider for cost of trays
+            Cbt = 468*math.exp(0.1482*(ID/12))   #ID here needs to be in feet
+            if self.numofstage < 20:
+                Fnt = 2.25/(1.0414**self.numofstage)
+            else:
+                Fnt = 1
+            Ftt = 1 # for sieve trays
+            Ftm = 1.401 + 0.0724*(ID/12)    #ID here needs to be in feet
+            Ct = self.numofstage * Fnt * Ftt * Ftm * Cbt
         else:
-            Fnt = 1
-        Ftt = 1 # for sieve trays
-        Ftm = 1.401 + 0.0724*(ID/12)    #ID here needs to be in feet
-        Ct = self.numofstage * Fnt * Ftt * Ftm * Cbt
+            Ct = 0
         Cp = Fm * Cv + Cpl + Ct
         Cp = Cp / 567 * CEindex
         Cbm = Cp * 4.16
