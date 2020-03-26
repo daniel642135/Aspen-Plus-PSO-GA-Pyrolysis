@@ -111,9 +111,9 @@ def optimisedechlorination(pso_gen, ga):
 def optimisecombustion(pso_gen, ga):
     aspen = init_aspen()
     comb = COMB(aspen)
-    pressure = [10, 30]
-    ER = [0.6, 0.8]
-    efficiency = [96, 99.99999999999999]
+    pressure = [11, 13]
+    ER = [0.7, 0.8]
+    efficiency = [99, 99.99999999999999]
 
     p_store = [pressure, ER, efficiency]
 
@@ -147,4 +147,4 @@ def optimisecombustion(pso_gen, ga):
 #optimisehclscrubber(pso_gen=1, ga=True)
 #optimisedechlorination(pso_gen=1, ga=True)
 
-optimisecombustion(pso_gen=5, ga=True)
+optimisecombustion(pso_gen=2, ga=True)
