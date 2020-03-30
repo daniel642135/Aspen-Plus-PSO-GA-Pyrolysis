@@ -3,7 +3,7 @@ import math
 class SEPARATE:
     def __init__(self, aspen):
         self.aspen = aspen
-        self.CEindex = 600  # Find value
+        self.CEindex = 603.1  # Find value
 
         self.hotgasvolflow = (self.Tree.FindNode(r"\Data\Streams\HOTGAS\Output\VOLFLMX\MIXED").Value + self.aspen.Tree.FindNode(r"\Data\Streams\HOTGAS\Output\VOLFLMX\CISOLID").Value)*0.0353146667 #convert from l/min to cfm
 
@@ -114,7 +114,7 @@ class SEPARATE:
         pumpeff = -0.316 + 0.24015* math.log(pumphead)-0.01199*(math.log(pumphead))**2
         Pb = pumphead*Pout*feedvolflow/(33000*pumpeff)
         motoreff = 0.8 + 0.0319 * math.log(Pb) - 0.00182 * (math.log(Pb)) ** 2
-        Pc = math.log(Pb/motoreff)
+        self.Pc = math.log(Pb/motoreff)
         motorCb = math.exp(5.8259 + 0.13141 * Pc + 0.053255 * (Pc) ** 2 + 0.028628 * (Pc) ** 3 - 0.0035549 * (Pc) ** 4)
         totalCb = Cb + motorCb
         Cbm = totalCb*3.3
@@ -123,15 +123,66 @@ class SEPARATE:
     def utilitycost(self):
         CEindex = self.CEindex
         Cf = 6 #$/GJ
-        pyrovapourcoolercost = self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER\Output\QNET").Value * 0.004184 * 3600 * 0.070 * self.CEindex/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1 # convert from cal/s to kW/h
+
+        #cooling water cooler
+        pyrovapourcoolercost = self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER\Output\QNET").Value *4.184 * 10**-6 * 3600 * 24 * 330 * 0.354  # using the cooling water given in Turton ($0.354/GJ) # convert from cal/s to GJ/s To consider that that can be considered as current price
 
         #refrigerant cooler
         T = self.aspen.Tree.FindNode(r"\Data\Blocks\B2\Input\TEMP").Value + 273.15 #oC to k
         Q = self.aspen.Tree.FindNode(r"\Data\Blocks\B2\Output\QNET").Value*4.184 #cal/s to kj/s
         a = 0.5*(Q**(-0.9))*(T**(-3))
         b = 1.1*(10**6)*(T**(-5))
-        refrigerantcoolercost = a*CEindex + b*Cf
+        Cu = a*CEindex + b*Cf #$/kJ
+        refrigerantcoolercost = Cu * Q * 3600 * 24 * 330
 
+        #pump utility cost
+        #make sure to run capital cost first before utility cost function or the self variable will not be updated
+        electricost = 0.01*CEindex + 0.00013*Cf #$/kwh
+        pumpcost = self.Pc * 0.7457 * 31.5 * 10**6 * electricost / 3600 /365 * 330 #$/year
+
+        def reboiler(duty, steamtempin, steamtempout, pressure):
+            CEindex = 603.1
+            #first law of thermo
+            steammolarenthalpy = 33.4*(10**-3)*steamtempin+0.688*(10**-5)/2*steamtempin**2+0.7604*(10**-8)/3*steamtempin**3-3.593*(10**-12)/4*steamtempin**4-(33.4*(10**-3)*steamtempout+0.688*(10**-5)/2*steamtempout^2+0.7604*(10**-8)/3*steamtempout**3-3.593*(10**-12)/4*steamtempout**4) #kJ/mol
+            steammassenthalpy = steammolarenthalpy / 18.02 * 1000 #kJ/kg
+            steamcapacity = duty / steammassenthalpy /3600 #kg/s
+            a = 2.3 * 10 ** -5 * steamcapacity ** -0.9
+            b = 0.0034 * pressure ** 0.05
+            process_steam = a * CEindex + b * 6 #Cf is $6/GJ
+            reboilercost = steamcapacity*31.5*10**6*process_steam/365*330 #check the formula here
+            return reboilercost
+
+        #HE heater to distillation using LPS
+        Q1 = self.aspen.Tree.FindNode(r"\Data\Blocks\LIQHEAT\Output\QNET").Value * 15.0624  # convert from cal/s to kJ/hr
+        Tin1 = 135  # oC
+        Tout1 = 123.89  # oC
+        P1 = 3.082  # barg
+        reboilercost1 = reboiler(Q1, Tin1, Tout1, P1)
+
+        #Distillation column reboiler using (check what steam is here)
+        Q2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\REB_DUTY").Value * 15.0624  # convert from cal/s to kJ/hr
+        Tin2 = 348.67  # oC
+        Tout2 = 329.78  # oC
+        P2 = 34.47  # barg
+        reboilercost2 = reboiler(Q2, Tin2, Tout2, P2)
+
+        #Distillation column cooler using cooling water
+        Q3 = abs(self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\COND_DUTY").Value) * 15.0624  # convert from cal/s to kJ/hr
+        Tin3 = 25 #oC
+        Tout3 = 49 #oC
+        CWmolarenthalpy = 75.4*(10**-3)*(Tout3-Tin3)*1000 #kJ/kmol
+        CWmassenthalpy = CWmolarenthalpy / 18.02 #kJ/kg
+        CWcapacity = Q3 / CWmassenthalpy / 1002 / 3600 #m3/s #at the lower limit of the correlation
+        if CWcapacity < 0.01:
+            CWcapacity = 0.01
+        a2 = 0.00007 + 2.5 * (10 ** -5) * CWcapacity ** -1
+        b2 = 0.003
+        process_cw = a2 * CEindex + b2 * 6 #Cf is $6/GJ
+        condensercost = CWcapacity*31.5*10**6*process_cw/365*330
+
+        #get total cost for utility
+        totalseparationutilitycost = pyrovapourcoolercost + refrigerantcoolercost + pumpcost + reboilercost1 + reboilercost2 + condensercost
+        return totalseparationutilitycost
 
     def vesselcost(self, L, ID, Po, To, corr, internal):  # corr is boolean
         CEindex = self.CEindex

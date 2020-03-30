@@ -99,7 +99,7 @@ def optimisedechlorination(pso_gen, ga):
     def func(individual):
         nonlocal dech
         inlettemp = individual
-        dech.solve_dech(inlettemp=inlettemp)
+        dech.solve_dech(reactortemp=inlettemp)
         return (dech.dech_result(),)
 
     pop, logbook, best = pso_ga(func=func, pmin=pmin, pmax=pmax,
@@ -143,8 +143,8 @@ def optimisecombustion(pso_gen, ga):
     return best
 
 
-#optimisepyrolysis(pso_gen=50, ga=True)
+#optimisepyrolysis(pso_gen=1, ga=True)
 #optimisehclscrubber(pso_gen=1, ga=True)
-#optimisedechlorination(pso_gen=1, ga=True)
+#optimisedechlorination(pso_gen=1, ga=True) #cannot solve for 1 DV, it will become a particle
 
-optimisecombustion(pso_gen=2, ga=True)
+#optimisecombustion(pso_gen=2, ga=True)

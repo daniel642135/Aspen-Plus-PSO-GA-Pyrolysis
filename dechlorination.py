@@ -6,16 +6,17 @@ class DECH:
         self.CEindex = 603.1 #2018 CE index
         self.pwastemassflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value
         self.n2massflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2\Input\TOTAL\MIXED").Value
-
+        self.dechtemp = self.aspen.Tree.FindNode(r"\Data\Blocks\DECH\Input\TEMP").Value
+        self.preheattemp = self.aspen.Tree.FindNode(r"\Data\Blocks\PREHEAT\Input\TEMP").Value
+        self.n2heatertemp = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HETER2\Input\TEMP").Value
 
     def solve_dech(self, reactortemp): #residencetime in min, reactortemp in oC
-        self.aspen.Engine.Reinit()  # reset the simulation
-        #DV
-        self.reactortemp = reactortemp #oC
-        self.aspen.Tree.FindNode(r"\Data\Blocks\DECH\Input\TEMP").Value = reactortemp
-        self.aspen.Tree.FindNode(r"\Data\Blocks\PREHEAT\Input\TEMP").Value = reactortemp
-        self.aspen.Tree.FindNode(r"\Data\Blocks\N2HETER2\Input\TEMP").Value = reactortemp
 
+        #DV
+        self.dechtemp = reactortemp
+        self.preheattemp = reactortemp
+        self.n2heatertemp = reactortemp
+        self.reactortemp = reactortemp #oC
         Ea = 136 #kJ/mol
         A = 10**11.48 #min-1
         n = 1.54
@@ -133,12 +134,12 @@ class DECH:
         return Cbm
 
     def dech_totalannualcost(self):
-        cost_of_heating = abs(self.n2heaterduty+self.dechheaterduty) * 0.004184 * 3600* 0.070  * 567/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
+        cost_of_heating = abs(self.n2heaterduty+self.dechheaterduty) * 0.004184 * 3600 * 0.070  * 8160 * 567/381.1 # to approximate using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
         # do I need to consider cost from dech unit
         Cbm = self.vesselcost()
         print("Cbm = " + str(Cbm))
         print("cost_of_heating = " + str(cost_of_heating))
-        annualcost = (Cbm/3) + (cost_of_heating*8160) #per year, but this would need to be J cost of the entire plant
+        annualcost = (Cbm/3) + (cost_of_heating) #per year, but this would need to be J cost of the entire plant
         print("annualcost = "+str(annualcost))
         return annualcost
 

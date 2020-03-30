@@ -216,11 +216,13 @@ class HCL:
         return Cbm
 
     def hcl_totalannualcost(self):
-        cost_of_cooling = abs(self.hclscrubbercoolerduty) * 0.004184 * 3600 * 0.070 * self.CEindex/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1 # convert from cal/s to kW/h
-        Cbm = self.vesselcost()
+        cost_of_cooling = abs(self.hclscrubbercoolerduty) *4.184 * 10**-6 * 3600 * 24 * 330 * 0.354  # using the cooling water given in Turton ($0.354/GJ) # convert from cal/s to GJ/s To consider that that can be considered as current price
+        Cbm = self.vesselcost(corr=True, internal=True)
         print("Cbm = "+str(Cbm))
         print("Cost of cooling = "+str(cost_of_cooling))
-        annualcost = (Cbm/3) + (cost_of_cooling*8160) #consider per year #need to add raw material cost
+        annualcost = (Cbm/3) + (cost_of_cooling) #consider per year #need to add raw material cost
+        #raw material cost
+
         return annualcost
 
     def hcl_result(self):

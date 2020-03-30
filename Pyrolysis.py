@@ -192,7 +192,7 @@ class PYRO:
     #vesselcost(L = 409, ID = 136, density = 0.284, Po = 0, To = 932, corr = False)
 
     def pyro_totalannualcost(self):
-        cost_of_heating = abs(self.n2fluidheaterduty) * 0.004184 * 3600* 0.070  * 567/381.1 # using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
+        cost_of_heating = abs(self.n2fluidheaterduty) * 0.004184 * 3600* 0.070  * 567/381.1 # to approximate using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
         #do I need to consider duty from pyro unit
         Cbm = self.vesselcost()
         print("Cbm = " + str(Cbm))

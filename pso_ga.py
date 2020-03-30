@@ -164,13 +164,13 @@ def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga, dv):
 
         for part in pop:
             # Linear annealing for inertia velocity coefficient (the w weights)
-            toolbox.update(part, best=best, w=wmax - (wmax-wmin)*g/pso_iter)
+            toolbox.update(part, best=best, w=wmax - (wmax-wmin)*(g/pso_iter)**iter_gamma)
 
         if ga:
             # GA segment
             # Start at max and approach min
-            ga_pop = round(ga_num_min + (g/pso_iter)**num_beta*(ga_num_max-ga_iter_min))
-            ga_gen = round(ga_iter_min + (g/pso_iter)**iter_gamma*(ga_iter_max-ga_iter_min))
+            ga_pop = round(ga_num_min + (g/pso_iter)**iter_gamma*(ga_num_max-ga_iter_min))
+            ga_gen = round(ga_iter_min + (g/pso_iter)**num_beta*(ga_iter_max-ga_iter_min))
             if len(pso_hof) == 0:
                 ga_mask = [1 for _ in range(ga_pop)] + [0 for _ in range(swarm_size-ga_pop)]
                 random.shuffle(ga_mask)
