@@ -5,14 +5,14 @@ class SEPARATE:
         self.aspen = aspen
         self.CEindex = 603.1  # Find value
 
-        self.hotgasvolflow = (self.Tree.FindNode(r"\Data\Streams\HOTGAS\Output\VOLFLMX\MIXED").Value + self.aspen.Tree.FindNode(r"\Data\Streams\HOTGAS\Output\VOLFLMX\CISOLID").Value)*0.0353146667 #convert from l/min to cfm
+        self.hotgasvolflow = (self.aspen.Tree.FindNode(r"\Data\Streams\HOTGAS\Output\VOLFLMX\MIXED").Value + self.aspen.Tree.FindNode(r"\Data\Streams\HOTGAS\Output\VOLFLMX\CISOLID").Value)*0.0353146667 #convert from l/min to cfm
 
         #to determine the ID and L of the separatiors
         #separator 1
-        self.vapordensity1 = self.aspen.Tree.FindNode(r"\Data\Blocks\B1\Stream Results\Table\Density gm/cc S2").Value*1000 #convert from g/cm3 to kg/m3
-        self.liquiddensity1 = self.aspen.Tree.FindNode(r"\Data\Blocks\B1\Stream Results\Table\Density gm/cc S3").Value*1000 #convert from g/cm3 to kg/m3
-        self.vaporvolflow1 = self.aspen.Tree.FindNode(r"\Data\Blocks\B1\Stream Results\Table\Total Flow l/min S2").Value*1.66667e-5 #convert from l/min to m3/s
-        self.liquidvolflow1 = self.aspen.Tree.FindNode(r"\Data\Blocks\B1\Stream Results\Table\Total Flow l/min S3").Value*1.66667e-5 #convert from l/min to m3/s
+        self.vapordensity1 = self.aspen.Tree.FindNode(r"\Data\Streams\S2\Output\RHOMX_MASS\MIXED").Value*1000 #convert from g/cm3 to kg/m3
+        self.liquiddensity1 = self.aspen.Tree.FindNode(r"\Data\Streams\S3\Output\RHOMX_MASS\MIXED").Value*1000 #convert from g/cm3 to kg/m3
+        self.vaporvolflow1 = self.aspen.Tree.FindNode(r"\Data\Streams\S2\Output\VOLFLMX\MIXED").Value*1.66667e-5 #convert from l/min to m3/s
+        self.liquidvolflow1 = self.aspen.Tree.FindNode(r"\Data\Streams\S3\Output\VOLFLMX\MIXED").Value*1.66667e-5 #convert from l/min to m3/s
         self.temp1 = self.aspen.Tree.FindNode(r"\Data\Blocks\B1\Input\TEMP").Value
         liquiddropletsdiameter1 = 0.000005 #m
         vapourviscosity1 = 0.01 #cP
@@ -35,10 +35,10 @@ class SEPARATE:
         self.ID1 = Dv1*39.3701 #convert from m to inch
 
         #flash 2
-        self.vapordensity2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B4\Stream Results\Table\Density gm/cc VAPOUR").Value*1000 #convert from g/cm3 to kg/m3
-        self.liquiddensity2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B4\Stream Results\Table\Density gm/cc S6").Value*1000 #convert from g/cm3 to kg/m3
-        self.vaporvolflow2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B4\Stream Results\Table\Total Flow l/min VAPOUR").Value*1.66667e-5 #convert from l/min to m3/s
-        self.liquidvolflow2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B4\Stream Results\Table\Total Flow l/min S6").Value*1.66667e-5 #convert from l/min to m3/s
+        self.vapordensity2 = self.aspen.Tree.FindNode(r"\Data\Streams\VAPOUR\Output\RHOMX_MASS\MIXED").Value*1000 #convert from g/cm3 to kg/m3
+        self.liquiddensity2 = self.aspen.Tree.FindNode(r"\Data\Streams\S6\Output\RHOMX_MASS\MIXED").Value*1000 #convert from g/cm3 to kg/m3
+        self.vaporvolflow2 = self.aspen.Tree.FindNode(r"\Data\Streams\VAPOUR\Output\VOLFLMX\MIXED").Value*1.66667e-5 #convert from l/min to m3/s
+        self.liquidvolflow2 = self.aspen.Tree.FindNode(r"\Data\Streams\S6\Output\VOLFLMX\MIXED").Value*1.66667e-5 #convert from l/min to m3/s
         self.temp2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B4\Input\TEMP").Value
         liquiddropletsdiameter2 = 0.000004 #m
         vapourviscosity2 = 0.01 #cP
@@ -67,12 +67,12 @@ class SEPARATE:
         self.temp3 = self.aspen.Tree.FindNode(r"\Data\Blocks\B5\Input\TEMP").Value
 
         #distillation
-        self.numofstage = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Input\NSTAGE").Value
+        self.numofstage = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\NSTAGE").Value
         self.L4 = self.numofstage*0.6*3.28084*1.3*12 #convert from m to inch
-        self.temp4 = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\BOTTOM_TEMP").Value #oC
-        feedmassflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\TOT_MASS_ABS").Value #kg/h
-        botmassflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\MASS_B").Value #kg/h
-        distmassflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\MASS_D").Value #kg/h
+        self.temp4 = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\TEMP_OUT\MIXED").Value #oC
+        feedmassflow = self.aspen.Tree.FindNode(r"\Data\Streams\LIQAFHEA\Output\MASSFLMX\$TOTAL").Value #kg/h
+        botmassflow = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\MASSFLMX\$TOTAL").Value #kg/h
+        distmassflow = self.aspen.Tree.FindNode(r"\Data\Streams\LIGHTACT\Output\MASSFLMX\$TOTAL").Value #kg/h
         refluxratio = 0.15 #to get from short cut column for the reflux ratio
 
         vapourmassflow = distmassflow*(1+refluxratio)
@@ -93,8 +93,9 @@ class SEPARATE:
         self.ID4 = ((4 * vapourmassflow) / (f * Uf * math.pi * (1 - A) * vapordensity) * 1000 * (1 / 3600) * (1 / 12) * 0.0610237) ** 0.5  # convert to in
 
     def cyclone(self):
-        Cp1 = math.exp(9.227-(0.7892*math.log(self.hotgasvolflow)+(0.08487*(math.log(self.hotgasvolflow))**2)))  #applicable for 200-10^5 cfm
-        return Cp1
+        Cp = math.exp(9.227-(0.7892*math.log(self.hotgasvolflow))+(0.08487*(math.log(self.hotgasvolflow))**2)) #applicable for 200-10^5 cfm
+        Cbm = Cp*2
+        return Cbm
 
     def pump(self):
         Pout = self.aspen.Tree.FindNode(r"\Data\Blocks\PUMP\Input\PRES").Value / 14.696 #atm
@@ -115,9 +116,10 @@ class SEPARATE:
         Pb = pumphead*Pout*feedvolflow/(33000*pumpeff)
         motoreff = 0.8 + 0.0319 * math.log(Pb) - 0.00182 * (math.log(Pb)) ** 2
         self.Pc = math.log(Pb/motoreff)
-        motorCb = math.exp(5.8259 + 0.13141 * Pc + 0.053255 * (Pc) ** 2 + 0.028628 * (Pc) ** 3 - 0.0035549 * (Pc) ** 4)
-        totalCb = Cb + motorCb
-        Cbm = totalCb*3.3
+        motorCb = math.exp(5.8259 + 0.13141 * self.Pc + 0.053255 * (self.Pc) ** 2 + 0.028628 * (self.Pc) ** 3 - 0.0035549 * (self.Pc) ** 4)
+        motorCp = Pdiff*motorCb*self.CEindex/500
+        totalCp = Cp + motorCp
+        Cbm = totalCp*3.3
         return Cbm
 
     def utilitycost(self):
@@ -125,11 +127,11 @@ class SEPARATE:
         Cf = 6 #$/GJ
 
         #cooling water cooler
-        pyrovapourcoolercost = self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER\Output\QNET").Value *4.184 * 10**-6 * 3600 * 24 * 330 * 0.354  # using the cooling water given in Turton ($0.354/GJ) # convert from cal/s to GJ/s To consider that that can be considered as current price
+        pyrovapourcoolercost = abs(self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER\Output\QNET").Value) *4.184 * 10**-6 * 3600 * 24 * 330 * 0.354  # using the cooling water given in Turton ($0.354/GJ) # convert from cal/s to GJ/s To consider that that can be considered as current price
 
         #refrigerant cooler
         T = self.aspen.Tree.FindNode(r"\Data\Blocks\B2\Input\TEMP").Value + 273.15 #oC to k
-        Q = self.aspen.Tree.FindNode(r"\Data\Blocks\B2\Output\QNET").Value*4.184 #cal/s to kj/s
+        Q = abs(self.aspen.Tree.FindNode(r"\Data\Blocks\B2\Output\QNET").Value)*4.184 #cal/s to kj/s
         a = 0.5*(Q**(-0.9))*(T**(-3))
         b = 1.1*(10**6)*(T**(-5))
         Cu = a*CEindex + b*Cf #$/kJ
@@ -143,7 +145,7 @@ class SEPARATE:
         def reboiler(duty, steamtempin, steamtempout, pressure):
             CEindex = 603.1
             #first law of thermo
-            steammolarenthalpy = 33.4*(10**-3)*steamtempin+0.688*(10**-5)/2*steamtempin**2+0.7604*(10**-8)/3*steamtempin**3-3.593*(10**-12)/4*steamtempin**4-(33.4*(10**-3)*steamtempout+0.688*(10**-5)/2*steamtempout^2+0.7604*(10**-8)/3*steamtempout**3-3.593*(10**-12)/4*steamtempout**4) #kJ/mol
+            steammolarenthalpy = 33.4*(10**-3)*steamtempin+0.688*(10**-5)/2*steamtempin**2+0.7604*(10**-8)/3*steamtempin**3-3.593*(10**-12)/4*steamtempin**4-(33.4*(10**-3)*steamtempout+0.688*(10**-5)/2*steamtempout**2+0.7604*(10**-8)/3*steamtempout**3-3.593*(10**-12)/4*steamtempout**4) #kJ/mol
             steammassenthalpy = steammolarenthalpy / 18.02 * 1000 #kJ/kg
             steamcapacity = duty / steammassenthalpy /3600 #kg/s
             a = 2.3 * 10 ** -5 * steamcapacity ** -0.9
@@ -182,6 +184,7 @@ class SEPARATE:
 
         #get total cost for utility
         totalseparationutilitycost = pyrovapourcoolercost + refrigerantcoolercost + pumpcost + reboilercost1 + reboilercost2 + condensercost
+        print(pyrovapourcoolercost, refrigerantcoolercost, pumpcost, reboilercost1, reboilercost2, condensercost)
         return totalseparationutilitycost
 
     def vesselcost(self, L, ID, Po, To, corr, internal):  # corr is boolean
@@ -289,6 +292,10 @@ class SEPARATE:
         S3capitalcost = self.vesselcost(self.L3, self.ID3, Po=0, To=self.temp3, corr=False, internal=False)
         S4capitalcost = self.vesselcost(self.L4, self.ID4, Po=0, To=self.temp4, corr=False, internal=True)
         cyclonecapticalcost = self.cyclone()
-
+        pumpcapitalcost = self.pump()
+        utilitycost = self.utilitycost()
+        totalcost = S1capitalcost + S2capitalcost + S3capitalcost + S4capitalcost + cyclonecapticalcost + pumpcapitalcost + utilitycost
+        print(S1capitalcost, S2capitalcost, S3capitalcost, S4capitalcost, cyclonecapticalcost, pumpcapitalcost, utilitycost)
+        print(totalcost)
 
 
