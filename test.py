@@ -2,6 +2,7 @@ from aspenplus.aspen_link import init_aspen
 from hclscrubber import HCL
 from Pyrolysis import PYRO
 from separation import SEPARATE
+from dechlorination import DECH
 
 def test1():
     aspen = init_aspen()
@@ -10,6 +11,13 @@ def test1():
     hclscrubber.hcl_result()
 
 #test1()
+
+def test5():
+    aspen = init_aspen()
+    dec = DECH(aspen)
+    dec.solve_dech(reactortemp = 330)
+
+test5()
 
 
 def test2():
@@ -26,6 +34,7 @@ def test3():
     sep = SEPARATE(aspen)
     sep.totalcost()
 
-test3()
+#test3()
+
 
 

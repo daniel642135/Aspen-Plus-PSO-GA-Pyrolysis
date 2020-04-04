@@ -23,13 +23,6 @@ class HCL:
         self.NAOHvolflow = self.aspen.Tree.FindNode(r"\Data\Streams\NAOHIN\Output\VOLFLMX2").Value
         self.N2HCLCvolflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\VOLFLMX2").Value
 
-        print("temp = " + str(self.coolertemp))
-        print("NAOHwaterin = " + str(self.NAOHwaterin))
-        print("NAOHOHin = " + str(self.NAOHOHin))
-        print("numofstage = " + str(self.numofstage))
-        print("n2massflow = " + str(self.n2massflow))
-        print("HCLmolfrac = " + str(self.HCLmolfrac))
-
     def solve_hcl(self, inlettemp, NAOHwaterflow, NAOHionsflow, N2flow):
         # DV
         self.coolertemp = inlettemp #oC
@@ -37,7 +30,6 @@ class HCL:
         self.NAOHNAin = NAOHionsflow #kmol/hr
         self.NAOHOHin = NAOHionsflow #kmol/hr
         self.aspen.Tree.FindNode(r"\Data\Streams\N2\Input\FLOW\MIXED\NITROGEN").Value = N2flow #kg/hr
-        print("n2massflow = "+str(self.aspen.Tree.FindNode(r"\Data\Streams\N2\Input\FLOW\MIXED\NITROGEN").Value))
 
         #self.aspen.Engine.Reinit()  # reset the simulation
         self.aspen.Engine.Run2()
@@ -49,43 +41,33 @@ class HCL:
         V_volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\VOLFLMX2").Value  # l/min
         V_molflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\MOLEFLMX\MIXED").Value  # kmol/hr
         V_massflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\MASSFLMX\$TOTAL").Value # kg/hr
-        print("V_massflow = "+str(V_massflow))
 
         #determine N number of stages
-
-        print("V = "+str(V_molflow))
         molfracofHClinV = self.aspen.Tree.FindNode(r"\Data\Streams\N2HCLC\Output\MOLEFRAC\MIXED\HCL").Value
 
         # need to get the correlation for K in terms of temp and pressure
         K = self.aspen.Tree.FindNode(r"\Data\Blocks\SCRUB\Output\B_K\5\HCL").Value  #distribution coefficient (this should be temperature and pressure dependent)
-        print("K = " + str(K))
 
         Liquidmin_molflow = K*V_molflow*(1-molfracofHClinV)   #(1- fiak) fraction of the key component in the feed gas that is to be absorbed
         Liquid_molflow = Liquidmin_molflow * 1.5 #l/min
-        print("Liquid = " + str(Liquid_molflow))
         Ae = Liquid_molflow / (K*V_molflow)
-        print("Ae = " + str(Ae))
         def function(N):
             return ((Ae-1)/((Ae**(N+1))-1)) - molfracofHClinV
 
         N = fsolve(function, 5)
         N = math.ceil(N)
-        print("N = " + str(N))
         self.numofstage = N
         self.numofstage2 = N
+        self.numoftrays = N
 
         #run aspen
-        #self.aspen.Engine.Reinit()  # reset the simulation
         self.aspen.Engine.Run2()
-        # target value
-        self.HClmolfractarget = self.HCLmolfrac
-        print("new hcl mol frac = " +  str(self.HClmolfractarget))
+
         # cooling duty
         self.hclscrubbercoolerduty = self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER1\Output\QNET").Value
         #determine L
         trayspacing = 24 #in typical value from aspen
         self.L = (self.numofstage-1)*trayspacing + 36 #in +36 to account for feed inlet distributor
-        print("L = " + str(self.L))
 
         #determine ID
         G = V_massflow  #kg/hr
@@ -93,33 +75,35 @@ class HCL:
         densityofliquid =self.aspen.Tree.FindNode(r"\Data\Streams\NAOHIN\Output\RHOMX_MASS\MIXED").Value #g/cm3
         f = 0.75
         surfacetension = 58.85 #surface tension of water (major component) n dyne/cm
-        print("densityofgas = "+str(densityofgas))
-        print("densityofliquid = "+str(densityofliquid))
-        print("L = "+str(L_massflow))
-        print("G = "+str(G))
         Flg = (L_massflow/G)*((densityofgas/densityofliquid)**0.5)
         Csb = -0.0717*math.log(Flg, 10)**2 - 0.273*math.log(Flg, 10) + 0.1299  #ft/s
         Fst = (surfacetension/20)**0.2
         Ff = 1
         Fha = 1 #considering that Ah/Aa > 0.1
-        print(str(Flg) + " " + str(Csb) + " " + str(Fst))
         C = Csb*Fst*Ff*Fha
-        print("C = "+ str(C))
         Uf = C*((densityofliquid - densityofgas)/densityofgas)**0.5  #ft/s
-        print("Uf = " + str(Uf))
         self.ID = ((4*G)/(f*Uf*math.pi*(1-0.1)*densityofgas)*1000*(1/3600)*(1/12)*0.0610237)**0.5 #convert to in
-        print("ID = " + str(self.ID))
 
-        #
+        self.scrubbertemp = self.aspen.Tree.FindNode(r"\Data\Blocks\SCRUB\Output\BOTTOM_TEMP").Value
 
-    def vesselcost(self, corr, internal):  # corr is boolean
+        #for determination of raw material cost
+        self.N2volflowrate = self.aspen.Tree.FindNode(r"\Data\Streams\N2\Output\VOLFLMX_GAS").Value #l/min
+        massofNa = self.aspen.Tree.FindNode(r"\Data\Streams\NAOHIN\Output\MASSFLOW\MIXED\NA+").Value #kg/hr
+        massofOH = self.aspen.Tree.FindNode(r"\Data\Streams\NAOHIN\Output\MASSFLOW\MIXED\OH-").Value #kg/hr
+        self.massofNaOH = massofNa + massofOH
+        massofwater = self.aspen.Tree.FindNode(r"\Data\Streams\NAOHIN\Output\MASSFLOW\MIXED\WATER").Value #kg/hr
+        self.volofwater = massofwater / 997 #convert kg/hr to m3/hr
 
-        Po = 0
-        To = self.aspen.Tree.FindNode(r"\Data\Blocks\SCRUB\Output\BOTTOM_TEMP").Value
-        L = self.L
-        ID = self.ID
+        #for determination of discharge limit
+        cleangasvolflow = self.aspen.Tree.FindNode(r"\Data\Streams\CLEANGAS\Output\VOLFLMX\MIXED").Value * 0.06 #convert l/min to m3/hr
+        HCLmassflow = self.aspen.Tree.FindNode(r"\Data\Streams\CLEANGAS\Output\MASSFLOW\MIXED\HCL").Value #kg/hr
+        cleangastemp = self.aspen.Tree.FindNode(r"\Data\Streams\CLEANGAS\Output\TEMP_OUT\MIXED").Value + 273.15 #convert oC to K
+        self.HCLppm = (HCLmassflow * (10**6) * 22.4 * cleangastemp) / (273.15 * cleangasvolflow * 36.46) #conversion to ppm
+        print(self.HCLppm)
+
+    def vesselcost(self, L, ID, Po, To, corr, internal, stage):  # corr is boolean
         CEindex = self.CEindex
-
+        To = To * 9 / 5 + 32  # to convert from oC to oF
         if Po <= 5:
             Pd = 10
         elif Po <= 1000:
@@ -130,7 +114,11 @@ class HCL:
         Td = To + 50  # temperature is in oF
 
         if not corr:
-            if Td <= 650:
+            if Td <= -4:
+                S = 20000  # SS304 for low temp operation
+                Fm = 1.7
+                density = 0.289
+            elif Td <= 650:
                 S = 13750  # Carbon steel SA-285
                 Fm = 1
                 density = 0.284
@@ -195,18 +183,21 @@ class HCL:
             ts = n * 0.25
 
         W = math.pi * (ID + ts) * (L + 0.8 * ID) * ts * density
-        Cv = math.exp(7.1390 + 0.18255 * (math.log(W)) + 0.02297 * (math.log(W)) ** 2)  # CE index = 567 (2013)  # 4200< W < 1,000,000 lb
+
+        Cv = math.exp(7.1390 + 0.18255 * (math.log(W)) + 0.02297 * (
+            math.log(W)) ** 2)  # CE index = 567 (2013)  # 4200< W < 1,000,000 lb
         Cpl = 410 * ((ID / 12) ** 0.7396) * ((L / 12) ** 0.70684)  # 3 < ID < 21 ft and 12 < L < 40 ft
+
         if internal:
-            #to consider for cost of trays
-            Cbt = 468*math.exp(0.1482*(ID/12))   #ID here needs to be in feet
-            if self.numofstage < 20:
-                Fnt = 2.25/(1.0414**self.numofstage)
+            # to consider for cost of trays
+            Cbt = 468 * math.exp(0.1482 * (ID / 12))  # ID here needs to be in feet
+            if stage < 20:
+                Fnt = 2.25 / (1.0414 ** stage)
             else:
                 Fnt = 1
-            Ftt = 1 # for sieve trays
-            Ftm = 1.401 + 0.0724*(ID/12)    #ID here needs to be in feet
-            Ct = self.numofstage * Fnt * Ftt * Ftm * Cbt
+            Ftt = 1  # for sieve trays
+            Ftm = 1.401 + 0.0724 * (ID / 12)  # ID here needs to be in feet
+            Ct = stage * Fnt * Ftt * Ftm * Cbt
         else:
             Ct = 0
         Cp = Fm * Cv + Cpl + Ct
@@ -217,20 +208,24 @@ class HCL:
 
     def hcl_totalannualcost(self):
         cost_of_cooling = abs(self.hclscrubbercoolerduty) *4.184 * 10**-6 * 3600 * 24 * 330 * 0.354  # using the cooling water given in Turton ($0.354/GJ) # convert from cal/s to GJ/s To consider that that can be considered as current price
-        Cbm = self.vesselcost(corr=True, internal=True)
-        print("Cbm = "+str(Cbm))
-        print("Cost of cooling = "+str(cost_of_cooling))
-        annualcost = (Cbm/3) + (cost_of_cooling) #consider per year #need to add raw material cost
+        Cbm = self.vesselcost(self.L, self.ID, Po=0, To=self.scrubbertemp, corr=True, internal=True, stage=self.numoftrays)
         #raw material cost
-
+        N2 = self.N2volflowrate * 0.001 * 60 * 24 * 330 * 0.65 #convert l/min to m3/yr, with the price of 0.65 per m3
+        NaOH = self.massofNaOH * 24 * 330 * 0.49 #convert to $/year for 0.49/kg
+        water = self.volofwater * 24 * 330 * 0.48 #convert to $/year for 0.48/kg
+        rawmaterialcost = N2 + NaOH + water
+        annualcost = (Cbm/3) + (cost_of_cooling) +rawmaterialcost #consider per year #need to add raw material cost
         return annualcost
+
 
     def hcl_result(self):
         annualcost = self.hcl_totalannualcost()
         objective = annualcost
         print("totalcost = "+str(objective))
+
         # Constraint
-        if self.HClmolfractarget > 0.001:    #to check on the discharge limit of HCL
+        if self.HCLppm > 85:    #to check on the discharge limit of HCL
             objective = 1e20
+
         return objective
 

@@ -20,10 +20,10 @@ class DECH:
         Ea = 136 #kJ/mol
         A = 10**11.48 #min-1
         n = 1.54
-        k = A*math.exp(-Ea*(10**3)/(8.314*(self.reactortemp)))
-        X = 0.98 #constrain to ensure limit PVC in plastic waste
+        k = A*math.exp(-Ea*(10**3)/(8.314*(self.reactortemp + 273.15))) #temp need to be in K
+        X = 0.98  #constrain to ensure limited PVC in plastic waste
         self.residencetime = -((1-X)**(1-n))/((1-n)*k)
-
+        print(self.residencetime)
         self.aspen.Engine.Run2()
 
         #to determine vessel sizing
@@ -40,11 +40,10 @@ class DECH:
         self.n2heaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\N2HETER2\Output\QNET").Value #cal/s
         self.dechheaterduty = self.aspen.Tree.FindNode(r"\Data\Blocks\PREHEAT\Output\QNET").Value #cal/s
 
-
     def vesselcost(self):  #corr is boolean
 
         Po = 0
-        To = self.reactortemp
+        To = self.reactortemp *9/5 + 32 #to convert from oC to oF
         corr = True
         L = self.L
         ID = self.ID
@@ -60,7 +59,11 @@ class DECH:
         Td = To + 50 # temperature is in oF
 
         if not corr:
-            if Td <= 650:
+            if Td <= -4:
+                S = 20000  # SS304 for low temp operation
+                Fm = 1.7
+                density = 0.289
+            elif Td <= 650:
                 S = 13750 #Carbon steel SA-285
                 Fm = 1
                 density = 0.284
@@ -134,17 +137,12 @@ class DECH:
         return Cbm
 
     def dech_totalannualcost(self):
-        cost_of_heating = abs(self.n2heaterduty+self.dechheaterduty) * 0.004184 * 3600 * 0.070  * 8160 * 567/381.1 # to approximate using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
-        # do I need to consider cost from dech unit
+        cost_of_heating = abs(self.n2heaterduty) * 0.004184 * 3600 * 0.070 * 8160 * 567/381.1 # chnage to molten salt
         Cbm = self.vesselcost()
-        print("Cbm = " + str(Cbm))
-        print("cost_of_heating = " + str(cost_of_heating))
         annualcost = (Cbm/3) + (cost_of_heating) #per year, but this would need to be J cost of the entire plant
-        print("annualcost = "+str(annualcost))
         return annualcost
 
     def dech_result(self):
-
 
         annual_cost = self.dech_totalannualcost()
         objective = annual_cost
