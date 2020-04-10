@@ -185,7 +185,7 @@ class COMB:
         self.D_int = D_int
         self.NOx_ppm = NOx_ppm
         self.CO_ppm = CO_ppm
-        return comb_j_cost
+        return comb_capital_cost, comb_utilities_cost, D_int, NOx_ppm, CO_ppm, turbine_power
 
     def comb_result(self):
         objective = self.comb_j_cost

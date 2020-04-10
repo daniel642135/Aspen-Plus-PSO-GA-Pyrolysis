@@ -1,4 +1,5 @@
 import math
+from iapws import IAPWS95
 
 class SEPARATE:
     def __init__(self, aspen):
@@ -66,31 +67,135 @@ class SEPARATE:
         self.ID3 = 0.9144*39.3701 #convert from m to inch
         self.temp3 = self.aspen.Tree.FindNode(r"\Data\Blocks\B5\Input\TEMP").Value
 
-        #distillation
-        self.numofstage = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\NSTAGE").Value
-        self.L4 = self.numofstage*0.6*3.28084*1.3*12 #convert from m to inch
-        self.temp4 = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\TEMP_OUT\MIXED").Value #oC
-        feedmassflow = self.aspen.Tree.FindNode(r"\Data\Streams\LIQAFHEA\Output\MASSFLMX\$TOTAL").Value #kg/h
-        botmassflow = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\MASSFLMX\$TOTAL").Value #kg/h
-        distmassflow = self.aspen.Tree.FindNode(r"\Data\Streams\LIGHTACT\Output\MASSFLMX\$TOTAL").Value #kg/h
-        refluxratio = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Input\RR").Value #this is the DV
+        self.count = 0
 
-        vapourmassflow = distmassflow*(1+refluxratio)
-        liquidmassflow = vapourmassflow - distmassflow
-        vapordensity = 0.0062228 #g/cm3 determine from Hysys - would change based on temperature, but the temperature change is small so it can be approximated to be constant
-        liquiddesnity = 0.540485191 #g/cm3 determine from Hysys - would change based on temperature, but the temperature change is small so it can be approximated to be constant
-        surfacetension = 23.05 #dyne/cm
+    def sep_solve(self, feedtemp, refluxmulti):
+        self.aspen.Tree.FindNode(r"\Data\Blocks\LIQHEAT\Input\TEMP").Value = feedtemp
+        self.reboilertemp = feedtemp
+        self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Input\RR").Value = -refluxmulti
 
-        Flg = (liquidmassflow / vapourmassflow) * ((vapordensity / liquiddesnity) ** 0.5)
-        Csb = -0.0717 * math.log(Flg, 10) ** 2 - 0.273 * math.log(Flg, 10) + 0.1299  # ft/s
-        Fst = (surfacetension / 20) ** 0.2
-        Ff = 1
-        Fha = 1  # considering that Ah/Aa > 0.1
-        C = Csb * Fst * Ff * Fha
-        f = 0.8
-        Uf = C * ((liquiddesnity - vapordensity) / vapordensity) ** 0.5  # ft/s
-        A = 0.1 + (Flg-0.1)/9
-        self.ID4 = ((4 * vapourmassflow) / (f * Uf * math.pi * (1 - A) * vapordensity) * 1000 * (1 / 3600) * (1 / 12) * 0.0610237) ** 0.5  # convert to in
+        self.aspen.Engine.Run2()
+        # retrieve info from shortcut column as initial guess, then put into distillation column
+        Rmin = self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\MIN_REFLUX").Value
+        feedtray = math.ceil(self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\FEED_LOCATN").Value)
+        stages = math.ceil(self.aspen.Tree.FindNode(r"\Data\Blocks\B6\Output\ACT_STAGES").Value)
+        Distflow = self.aspen.Tree.FindNode(r"\Data\Streams\LIGHT\Output\MASSFLMX_LIQ").Value #kg/hr
+
+        self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_D").Value = Distflow
+        self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_RR").Value = self.aspen.Tree.FindNode("\Data\Blocks\B6\Output\ACT_REFLUX").Value
+        self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\DP_COL").Value = 5 #pressure drop across column is 5 psi, maybe can change to dependent on number of stages
+        #self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\DP_STAGE").Value = 0.1 #pressure drop per stage
+        self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\FEED_STAGE\LIQAFHE2").Value = feedtray
+        self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\NSTAGE").Value = stages #number of stages includes condenser and reboiler
+        self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\PROD_STAGE\HEAVYACT").Value = stages
+        print(feedtemp, refluxmulti, feedtray, stages)
+        print(self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_D").Value, self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_RR").Value, self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\FEED_STAGE\LIQAFHE2").Value, self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\NSTAGE").Value, self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\PROD_STAGE\HEAVYACT").Value)
+        # to make sure that the pump of the feed is higher than the feed tray pressure
+        self.aspen.Engine.Run2()
+
+        self.count += 1
+        print(self.count)
+        print(self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\BOTTOM_TEMP").Value, self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\BU_RATIO").Value)
+
+        # determine column diameter and height
+        # determine L
+        trayspacing = 24  # in typical value from aspen
+        self.tray = stages - 1
+        self.L4 = (stages - 1) * trayspacing + 36  # in +36 to account for feed inlet distributor, one of the stage is reboiler
+
+        # determine ID
+        def diameter(V_massflow, L_massflow, densityofgas, densityofliquid, surfacetension):
+            G = V_massflow  # kg/hr
+            f = 0.75
+
+            Flg = (L_massflow / G) * ((densityofgas / densityofliquid) ** 0.5)
+            if Flg < 0.01:
+                Csb = 0.39
+            if Flg < 2:
+                Csb = -0.0717 * math.log(Flg, 10) ** 2 - 0.273 * math.log(Flg, 10) + 0.1299  # ft/s
+            else:
+                Csb = 0.04 #use to indicate out of correlation
+            Fst = (surfacetension / 20) ** 0.2
+            Ff = 1
+            Fha = 1  # considering that Ah/Aa > 0.1
+            C = Csb * Fst * Ff * Fha
+            Uf = C * ((densityofliquid - densityofgas) / densityofgas) ** 0.5  # ft/s
+            if Flg <= 0.1:
+                downarea = 0.1
+            elif Flg <= 1:
+                downarea = 0.1 + (Flg - 0.1)/9
+            else:
+                downarea = 0.2
+            ID = ((4 * G) / (f * Uf * math.pi * (1 - downarea) * densityofgas) * 1000 * (1 / 3600) * (1 / 12) * 0.0610237) ** 0.5  # convert to in
+            return ID, Csb
+
+        #given that the feed can be saturated liquid or saturated vapour, need to check top and bottom sides
+
+        #distflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\MASS_D").Value
+        #botflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\MASS_B").Value
+        # distflow = self.aspen.Tree.FindNode(r"\Data\Streams\LIGHTACT\Output\MASSFLMX\MIXED").Value
+        # botflow = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\MASSFLMX\MIXED").Value
+        # RR = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_RR").Value
+        # VN = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\MASS_VN").Value
+        # TopV = distflow*(1+RR)
+        # TopL = TopV - distflow
+        # BotV = VN
+        # BotL = VN + botflow
+        #Application.Tree.FindNode("\Data\Blocks\B7\Output\BU_RATIO")
+
+        self.aspen.Engine.Run2()
+        TopV = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\VAP_FLOW\2").Value
+        TopL = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\LIQ_FLOW\2").Value
+        BotV = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\VAP_FLOW\\' + str(stages-1)).Value
+        BotL = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\LIQ_FLOW\\' + str(stages-1)).Value
+
+        if TopV > BotV:
+            V_mw = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\MW_GAS\\' + str(2)).Value
+            V_massflow = TopV * V_mw * 1.2 #size 20% more to account for buffer
+            V_moldensity = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\RHO_GAS\\' + str(2)).Value
+        else:
+            V_mw = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\MW_GAS\\' + str(stages-1)).Value
+            V_massflow = BotV * V_mw * 1.2
+            V_moldensity = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\RHO_GAS\\' + str(stages-1)).Value
+
+        if TopL > BotL:
+            L_mw = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\MW_LIQ\\' + str(2)).Value
+            L_massflow = TopL * L_mw * 1.2
+            L_moldensity = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\RHO_LIQ\\' + str(2)).Value
+        else:
+            L_mw = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\MW_LIQ\\' + str(stages-1)).Value
+            L_massflow = BotL * L_mw * 1.2
+            L_moldensity = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\RHO_LIQ\\' + str(stages-1)).Value
+
+        #L_massflow = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\LIQ_FLOW_MS\\' + str(feedtray+1)).Value #kg/hr
+        #V_massflow = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\VAP_FLOW_MS\\' + str(feedtray+1)).Value #kg/hr
+
+        # L_mw = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\MW_LIQ\\' + str(feedtray+1)).Value
+        # V_mw = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\MW_GAS\\' + str(feedtray+1)).Value
+        # L_moldensity = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\RHO_LIQ\\' + str(feedtray+1)).Value
+        # V_moldensity = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\RHO_GAS\\' + str(feedtray+1)).Value
+        L_massdensity = L_moldensity * L_mw #g/cc
+        V_massdensity = V_moldensity * V_mw #g/cc
+        surfacetension = 6.27868046594332  # dyne/cm
+
+        self.ID4, Csb = diameter(V_massflow, L_massflow, V_massdensity, L_massdensity, surfacetension)
+
+        def round_up(n, decimals=0):
+            multiplier = 10 ** decimals
+            return math.ceil(n * multiplier) / multiplier
+
+        feedpressure = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\B_PRES\\' + str(feedtray)).Value #Feed pressure
+        feedpressure = round_up(feedpressure, 2)
+        print("height = " + str(self.L4), "diameter = " + str(self.ID4), "stage = " + str(stages), "feed stage = " + str(feedtray), "feed pressure = " + str(feedpressure), "reflux = " + str(self.aspen.Tree.FindNode("\Data\Blocks\B6\Output\ACT_REFLUX").Value))
+        self.temp4 = self.aspen.Tree.FindNode("\Data\Blocks\B7\Output\BOTTOM_TEMP").Value #oC
+        pressure = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\PRES_OUT\MIXED").Value #bar
+        self.pressure = (pressure * 14.5038) - 14.6959 #psig
+
+        #retrieve flow rate of products
+        dieselflow = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\VOLFLMX\MIXED").Value #l/min
+        gasolineflow = self.aspen.Tree.FindNode(r"\Data\Streams\LIGHTACT\Output\VOLFLMX\MIXED").Value #l/min
+
+        return self.L4, self.ID4, dieselflow, gasolineflow, Csb
 
     def cyclone(self):
         Cp = math.exp(9.227-(0.7892*math.log(self.hotgasvolflow))+(0.08487*(math.log(self.hotgasvolflow))**2)) #applicable for 200-10^5 cfm
@@ -118,7 +223,7 @@ class SEPARATE:
         motorCp = Pdiff*motorCb*self.CEindex/500
         totalCp = Cp + motorCp
         Cbm = totalCp*3.3
-        print(Pdiff, feeddensity, pumphead, feedmassflow, pumpsize, self.Pc)
+
         return Cbm
 
     def utilitycost(self):
@@ -126,7 +231,8 @@ class SEPARATE:
         Cf = 6 #$/GJ
 
         #cooling water cooler
-        pyrovapourcoolercost = abs(self.aspen.Tree.FindNode(r"\Data\Blocks\COOLER\Output\QNET").Value) *4.184 * 10**-9 * 3600 * 24 * 330 * 0.378  # using the cooling water given in Turton ($0.378/GJ) # convert from cal/s to GJ/s To consider that that can be considered as current price
+        totalcoolingduty = abs(self.aspen.Tree.FindNode(r"\Data\Blocks\VAPC1\Output\QNET").Value + self.aspen.Tree.FindNode(r"\Data\Blocks\VAPC2\Output\QNET").Value + self.aspen.Tree.FindNode(r"\Data\Blocks\VAPC3\Output\QNET").Value + self.aspen.Tree.FindNode(r"\Data\Blocks\VAPC4\Output\QNET").Value + self.aspen.Tree.FindNode(r"\Data\Blocks\VAPC5\Output\QNET").Value)
+        pyrovapourcoolercost = totalcoolingduty *4.184 * 10**-9 * 3600 * 24 * 330 * 0.378  # using the cooling water given in Turton ($0.378/GJ) # convert from cal/s to GJ/s To consider that that can be considered as current price
 
         #refrigerant cooler
         T = self.aspen.Tree.FindNode(r"\Data\Blocks\B2\Input\TEMP").Value + 273.15 #oC to k
@@ -135,37 +241,48 @@ class SEPARATE:
         b = 1.1*(10**6)*(T**(-5))
         Cu = a*CEindex + b*Cf #$/kJ
         refrigerantcoolercost = Cu * Q * 3600 * 24 * 330
-
+        print(T, Q, a, b, Cu, refrigerantcoolercost)
         #pump utility cost
         #make sure to run capital cost first before utility cost function or the self variable will not be updated
         electricost = 0.00013*CEindex + 0.01*Cf #$/kwh
         pumpcost = self.Pc * 0.7457 * 31.5 * 10**6 * electricost / 3600 /365 * 330 #$/year
-        print(self.Pc)
-        def reboiler(duty, steamtempin, steamtempout, pressure):
+
+        def reboiler(duty, steamtempin, pressure):
             CEindex = 603.1
             #first law of thermo
-            steammolarenthalpy = 33.4*(10**-3)*steamtempin+0.688*(10**-5)/2*steamtempin**2+0.7604*(10**-8)/3*steamtempin**3-3.593*(10**-12)/4*steamtempin**4-(33.4*(10**-3)*steamtempout+0.688*(10**-5)/2*steamtempout**2+0.7604*(10**-8)/3*steamtempout**3-3.593*(10**-12)/4*steamtempout**4) #kJ/mol
-            steammassenthalpy = steammolarenthalpy / 18.02 * 1000 #kJ/kg
-            steamcapacity = duty / steammassenthalpy /3600 #kg/s
+            sat_steam = IAPWS95(T=steamtempin + 273.15, x=1)
+            sat_liquid = IAPWS95(T=steamtempin + 273.15, x=0)
+            latentheat = sat_steam.h - sat_liquid.h
+            steamcapacity = duty / latentheat / 3600 #kg/s
             a = 2.3 * 10 ** -5 * steamcapacity ** -0.9
             b = 0.0034 * pressure ** 0.05
             process_steam = a * CEindex + b * 6 #Cf is $6/GJ
             reboilercost = steamcapacity*31.5*10**6*process_steam/365*330 #check the formula here
+
             return reboilercost
 
-        #HE heater to distillation using LPS
-        Q1 = self.aspen.Tree.FindNode(r"\Data\Blocks\LIQHEAT\Output\QNET").Value * 15.0624  # convert from cal/s to kJ/hr
-        Tin1 = 135  # oC fixed based on process stream and heuristics
-        Tout1 = 123.89  # oC fixed based on process stream and heuristics
-        P1 = 3.082  # barg (based on LPS)
-        reboilercost1 = reboiler(Q1, Tin1, Tout1, P1)
+        P1 = 0
+        Tin1 = 0
 
-        #Distillation column reboiler using (check what steam is here) #the problem here will be no stream can heat up to 300 plus
-        Q2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\REB_DUTY").Value * 15.0624  # convert from cal/s to kJ/hr
-        Tin2 = 348.67  # oC (need to change to retrieve from aspen plus)
-        Tout2 = 329.78  # oC (need to change to retrieve from aspen plus)
-        P2 = 34.47  # barg (based on HPS but need to change)
-        reboilercost2 = reboiler(Q2, Tin2, Tout2, P2)
+        #HE heater to distillation using different steam for different temperature
+        if self.reboilertemp < 114: #LPS 125-124
+            P1 = 1.31 #barg
+            Tin1 = 125  # oC
+        elif self.reboilertemp < 164: #MPS 175-174
+            P1 = 7.91  # barg
+            Tin1 = 175  # oC
+        elif self.reboilertemp < 239: #HPS 250-249
+            P1 = 38.75  # barg
+            Tin1 = 250  # oC
+
+        Q1 = self.aspen.Tree.FindNode(r"\Data\Blocks\LIQHEAT\Output\QNET").Value * 15.0624  # convert from cal/s to kJ/hr
+        reboilercost1 = reboiler(Q1, Tin1, P1)
+
+        #Distillation column reboiler (fired heater) utility based on natural gas
+        Q2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\REB_DUTY").Value * 0.00396567  # convert from cal/s to Btu/s
+        #for 70% efficiency
+        natgas = Q2/0.7/1050 * 3600 * 24 * 330 # SCF/yr
+        reboilercost2 = natgas * 5/1000 * CEindex/381.1 #$5/1000 SCF in 1995 price
 
         #Distillation column cooler using cooling water
         Q3 = abs(self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\COND_DUTY").Value) * 15.0624  # convert from cal/s to kJ/hr
@@ -187,8 +304,10 @@ class SEPARATE:
         return totalseparationutilitycost
 
     def vesselcost(self, L, ID, Po, To, corr, internal, stage):  # corr is boolean
+
         CEindex = self.CEindex
-        To = To *9/5 + 32 #to convert from oC to oF
+        To = To * 9 / 5 + 32  # to convert from oC to oF
+
         if Po <= 5:
             Pd = 10
         elif Po <= 1000:
@@ -228,9 +347,14 @@ class SEPARATE:
                 Fm = 2.1
                 density = 0.289
         else:
-            S = 16700  # SS316L
-            Fm = 2.1
-            density = 0.289
+            if Td > 300:
+                S = 6200  # Nickel 201
+                Fm = 5.4
+                density = 0.321
+            else:
+                S = 16700  # SS316L
+                Fm = 2.1
+                density = 0.289
 
         E = 0.85
         tp = Pd * ID / (2 * S * E - 1.2 * Pd)
@@ -248,7 +372,7 @@ class SEPARATE:
             tpmin = n2 * (1 / 16) + (1 / 4)
             if tp < tpmin:
                 tp = tpmin
-        print(tp)
+
         Do = ID + 2 * 1.25
         tw = (0.22 * (Do + 18) * L ** 2) / (S * (Do ** 2))
         tpbtm = tp + tw
@@ -268,19 +392,19 @@ class SEPARATE:
             ts = n * 0.25
 
         W = math.pi * (ID + ts) * (L + 0.8 * ID) * ts * density
-        print(W, ID, ts, L, density)
+
         Cv = math.exp(7.1390 + 0.18255 * (math.log(W)) + 0.02297 * (math.log(W)) ** 2)  # CE index = 567 (2013)  # 4200< W < 1,000,000 lb
         Cpl = 410 * ((ID / 12) ** 0.7396) * ((L / 12) ** 0.70684)  # 3 < ID < 21 ft and 12 < L < 40 ft
 
         if internal:
-            #to consider for cost of trays
-            Cbt = 468*math.exp(0.1482*(ID/12))   #ID here needs to be in feet
+            # to consider for cost of trays
+            Cbt = 468 * math.exp(0.1482 * (ID / 12))  # ID here needs to be in feet
             if stage < 20:
-                Fnt = 2.25/(1.0414**stage)
+                Fnt = 2.25 / (1.0414 ** stage)
             else:
                 Fnt = 1
-            Ftt = 1 # for sieve trays
-            Ftm = 1.401 + 0.0724*(ID/12)    #ID here needs to be in feet
+            Ftt = 1  # for sieve trays
+            Ftm = 1.401 + 0.0724 * (ID / 12)  # ID here needs to be in feet
             Ct = stage * Fnt * Ftt * Ftm * Cbt
         else:
             Ct = 0
@@ -290,17 +414,135 @@ class SEPARATE:
 
         return Cbm
 
+    def towercost(self, L, ID, Po, To, corr, internal, stage):  # corr is boolean
+        CEindex = self.CEindex
+        To = To * 9 / 5 + 32  # to convert from oC to oF
+        if Po <= 5:
+            Pd = 10
+        elif Po <= 1000:
+            Pd = math.exp(0.60608 + 0.91615 * math.log(Po) + 0.0015655 * (math.log(Po)) ** 2)
+        else:
+            Pd = 1.1 * Po
+
+        Td = To + 50  # temperature is in oF
+
+        if not corr:
+            if Td <= -4:
+                S = 20000  # SS304 for low temp operation
+                Fm = 1.7
+                density = 0.289
+            elif Td <= 650:
+                S = 13750  # Carbon steel SA-285
+                Fm = 1
+                density = 0.284
+            elif Td <= 750:
+                S = 15000  # low alloy carbon steel SA387B
+                Fm = 1.2
+                density = 0.284
+            elif Td <= 800:
+                S = 14750
+                Fm = 1.2
+                density = 0.284
+            elif Td <= 850:
+                S = 14200
+                Fm = 1.2
+                density = 0.284
+            elif Td <= 900:
+                S = 13100
+                Fm = 1.2
+                density = 0.284
+            else:
+                S = 20000  # SS316 max temp is 1500 oF
+                Fm = 2.1
+                density = 0.289
+        else:
+            if Td > 300:
+                S = 6200  # Nickel 201
+                Fm = 5.4
+                density = 0.321
+            else:
+                S = 16700  # SS316L
+                Fm = 2.1
+                density = 0.289
+
+        E = 0.85
+        tp = Pd * ID / (2 * S * E - 1.2 * Pd)
+        if tp > 1.25:
+            E = 1
+        tp = Pd * ID / (2 * S * E - 1.2 * Pd)
+
+        if ID < 48:
+            if tp < 0.25:
+                tp = 0.25
+        else:
+            ID2 = ID - 48
+            ID2 = ID2 / 24
+            n2 = math.ceil(ID2)
+            tpmin = n2 * (1 / 16) + (1 / 4)
+            if tp < tpmin:
+                tp = tpmin
+
+        Do = ID + 2 * 1.25
+        tw = (0.22 * (Do + 18) * L ** 2) / (S * (Do ** 2))
+        tpbtm = tp + tw
+        tv = (tpbtm + tp) / 2
+        ts = tv + 0.125
+        if ts <= 0.5:
+            n = ts / 0.0625
+            n = math.ceil(n)
+            ts = n * 0.0625
+        elif ts <= 2:
+            n = ts / 0.125
+            n = math.ceil(n)
+            ts = n * 0.125
+        elif ts <= 3:
+            n = ts / 0.25
+            n = math.ceil(n)
+            ts = n * 0.25
+
+        W = math.pi * (ID + ts) * (L + 0.8 * ID) * ts * density
+        self.W = W
+        Cv = math.exp(10.5449 - 0.4672 * (math.log(W)) + 0.05482 * (math.log(W)) ** 2)  # CE index = 567 (2013)  # 9,000 < W < 2,500,000 lb
+        Cpl = 341 * ((ID / 12) ** 0.63316) * ((L / 12) ** 0.80161)  # 3 < ID < 21 ft and 27 < L < 170 ft
+        print("W = " + str(W), "Cpl = " + str(Cpl))
+        if internal:
+            # to consider for cost of trays
+            Cbt = 468 * math.exp(0.1482 * (ID / 12))  # ID here needs to be in feet
+            if stage < 20:
+                Fnt = 2.25 / (1.0414 ** stage)
+            else:
+                Fnt = 1
+            Ftt = 1  # for sieve trays
+            Ftm = 1.401 + 0.0724 * (ID / 12)  # ID here needs to be in feet
+            Ct = stage * Fnt * Ftt * Ftm * Cbt
+        else:
+            Ct = 0
+        Cp = Fm * Cv + Cpl + Ct
+        Cp = Cp / 567 * CEindex
+        Cbm = Cp * 4.16
+
+        return Cbm, W
+
+
     def totalcost(self):
         S1capitalcost = self.vesselcost(self.L1, self.ID1, Po=0, To=self.temp1, corr=False, internal=False, stage=0)
         S2capitalcost = self.vesselcost(self.L2, self.ID2, Po=0, To=self.temp2, corr=False, internal=False, stage=0)
         S3capitalcost = self.vesselcost(self.L3, self.ID3, Po=0, To=self.temp3, corr=False, internal=False, stage=0)
-        S4capitalcost = self.vesselcost(self.L4, self.ID4, Po=0, To=self.temp4, corr=False, internal=True, stage=self.numofstage)
+        S4capitalcost, W = self.towercost(self.L4, self.ID4, Po=self.pressure, To=self.temp4, corr=False, internal=True, stage=self.tray)
         cyclonecapticalcost = self.cyclone()
         pumpcapitalcost = self.pump()
-
         utilitycost = self.utilitycost()
-        totalcost = S1capitalcost + S2capitalcost + S3capitalcost + S4capitalcost + cyclonecapticalcost + pumpcapitalcost + utilitycost
+        Cbm = S1capitalcost + S2capitalcost + S3capitalcost + S4capitalcost + cyclonecapticalcost + pumpcapitalcost
+        totalcost = (S1capitalcost + S2capitalcost + S3capitalcost + S4capitalcost + cyclonecapticalcost + pumpcapitalcost)/3 + utilitycost
         print(S1capitalcost, S2capitalcost, S3capitalcost, S4capitalcost, cyclonecapticalcost, pumpcapitalcost, utilitycost)
         print(totalcost)
+        return Cbm, utilitycost, W
+    def sep_result(self):
+        Jcost = self.totalcost()
+        objective = Jcost
 
+        #constraint
+        if self.L4/self.ID4 > 20:
+            objective = 1e20
 
+        return objective
