@@ -31,7 +31,8 @@ class COMB:
         propene_stoic = propene_feed_massflow * 14.796
         butane_stoic = butane_feed_massflow * 15.476
         CO_stoic = CO_feed_massflow * 2.466
-        stoichiometric_air = methane_stoic + ethane_stoic + ethene_stoic + propane_stoic + propene_stoic + butane_stoic + CO_stoic
+        stoichiometric_air = methane_stoic + ethane_stoic + ethene_stoic + propane_stoic + propene_stoic + butane_stoic\
+                             + CO_stoic
 
         actual_mass_flow_rate_of_air = stoichiometric_air / OER
 
@@ -40,12 +41,13 @@ class COMB:
         self.aspen.Tree.FindNode(r"\Data\Blocks\ANNULAR\Input\PRES").Value = OP
 
         self.aspen.Engine.run2()
-        # print(self.aspen.Tree.FindNode(r"\Data\Blocks\AIRCOMP\Input\PRATIO").Value, self.aspen.Tree.FindNode(r"\Data\Blocks\FUELCOMP\Input\PRATIO").Value , self.aspen.Tree.FindNode(r"\Data\Blocks\ANNULAR\Input\PRES").Value)
+
         T_inlet = round(self.aspen.Tree.FindNode(r"\Data\Streams\PREMIXED\Output\TEMP_OUT\MIXED").Value + 273.15, 1)
         cooling_air_percentage = ((0.1 * T_inlet - 30) + 100) / 100
         compressed_air_needed = actual_mass_flow_rate_of_air * cooling_air_percentage
         self.aspen.Tree.FindNode(r"\Data\Streams\ATMAIR\Input\TOTFLOW\MIXED").Value = compressed_air_needed
-        self.aspen.Tree.FindNode(r"\Data\Blocks\COMPSPLI\Input\BASIS_FLOW\TOPREMIX").Value = actual_mass_flow_rate_of_air
+        self.aspen.Tree.FindNode(r"\Data\Blocks\COMPSPLI\Input\BASIS_FLOW\TOPREMIX").Value = \
+            actual_mass_flow_rate_of_air
         # print(compressed_air_needed, actual_mass_flow_rate_of_air)
 
         self.aspen.Engine.run2()
@@ -57,10 +59,10 @@ class COMB:
         C2_heat = (ethane_feed_massflow * 51.9) + (ethene_feed_massflow * 47.2)
         C3_heat = (propane_feed_massflow * 50.4) + (propene_feed_massflow * 49)
         C4_heat = butane_feed_massflow * 49.5
-        print(C1_heat,C2_heat,C3_heat,C4_heat)
+        #print(C1_heat,C2_heat,C3_heat,C4_heat)
         total_heat = C1_heat + C2_heat + C3_heat + C4_heat  # in MJ/hr
         mass_out = self.aspen.Tree.FindNode(r"\Data\Streams\FLUE\Output\MASSFLMX\MIXED").Value  # in kG/hr
-        print(total_heat, mass_out)
+        #print(total_heat, mass_out)
         actual_heat = (eff * total_heat) / 100
         delta_T = (actual_heat / mass_out) / 0.0013
         T4 = delta_T + T3
@@ -69,9 +71,9 @@ class COMB:
         A_L = 0.66 * A_ref
         A_an = A_ref - A_L
         PF = (Tmax - T4) / (T4 - T3)
-        D_ref = ((m3 * theta) / (P3 ** 1.75 * A_ref * math.exp(T3 / b))) ** (4 / 3)
+        D_ref = ((m3 * theta) / (P3 ** 1.75 * A_ref * np.exp(T3 / b))) ** (4 / 3)
         D_L = D_ref * 0.66
-        L_L = (-1 * D_L) / (0.05 * P34_qref * math.log(1 - PF))
+        L_L = (-1 * D_L) / (0.05 * P34_qref * np.log(1 - PF))
         L_PZ = 0.75 * D_L
         L_SZ = 0.5 * D_L
         L_DZ = D_L * (3.83 - 11.83 * PF + 13.4 * PF ** 2)
@@ -85,12 +87,14 @@ class COMB:
         self.aspen.Tree.FindNode(r"\Data\Blocks\DILUTION\Input\LENGTH").Value = PFR_L
         self.aspen.Engine.run2()
 
-        # print(self.aspen.Tree.FindNode(r"\Data\Blocks\ANNULAR\Input\VOL").Value,self.aspen.Tree.FindNode(r"\Data\Blocks\DILUTION\Input\DIAM").Value,self.aspen.Tree.FindNode(r"\Data\Blocks\DILUTION\Input\LENGTH").Value)
-
-        combustor_inlet_mass_flow = round(self.aspen.Tree.FindNode(r"\Data\Streams\PREMIXED\Output\MASSFLMX\MIXED").Value / 3600, 1)  # in kg/s
-        operating_pressure = round(self.aspen.Tree.FindNode(r"\Data\Streams\PREMIXED\Output\PRES_OUT\MIXED").Value * 100000, 1)  # in Pa
-        inlet_temperature = round(self.aspen.Tree.FindNode(r"\Data\Streams\PREMIXED\Output\TEMP_OUT\MIXED").Value + 273.15, 1)  # in K
-        outlet_temperature = round(self.aspen.Tree.FindNode(r"\Data\Streams\FLUE\Output\TEMP_OUT\MIXED").Value + 273.15, 1)  # in K
+        combustor_inlet_mass_flow = round(
+            self.aspen.Tree.FindNode(r"\Data\Streams\PREMIXED\Output\MASSFLMX\MIXED").Value / 3600, 1)  # in kg/s
+        operating_pressure = round(
+            self.aspen.Tree.FindNode(r"\Data\Streams\PREMIXED\Output\PRES_OUT\MIXED").Value * 100000, 1)  # in Pa
+        inlet_temperature = round(
+            self.aspen.Tree.FindNode(r"\Data\Streams\PREMIXED\Output\TEMP_OUT\MIXED").Value + 273.15, 1)  # in K
+        outlet_temperature = round(
+            self.aspen.Tree.FindNode(r"\Data\Streams\FLUE\Output\TEMP_OUT\MIXED").Value + 273.15, 1)  # in K
         CO_ppm = self.aspen.Tree.FindNode(r"\Data\Streams\FLUESTAC\Output\MASSFRAC\MIXED\CO").Value  # mass_frac
         turbine_power = self.aspen.Tree.FindNode(r"\Data\Blocks\TURBINE\Output\WNET").Value  # in kW
         fuel_comp_power = self.aspen.Tree.FindNode(r"\Data\Blocks\FUELCOMP\Output\WNET").Value  # in kW
@@ -104,9 +108,9 @@ class COMB:
         fuel_comp_base_cost = math.exp(9.1553 + 0.63 * math.log(hp_fuel_comp))
         turbine_base_cost = 1618.8 * ((hp_turbine_comp) ** 0.7951)
 
-        MOC_air_comp = 2
-        MOC_fuel_comp = 2
-        MOC_turbine = 2
+        MOC_air_comp = 1
+        MOC_fuel_comp = 1
+        MOC_turbine = 1
 
         BM_coefficient = 2.15
 
@@ -126,10 +130,11 @@ class COMB:
         comb_utilities_cost = (fuel_comp_power + air_comp_power) * 0.12 * 8760  # USD/year
         comb_capital_cost = adj_BMC_air_comp + adj_BMC_fuel_comp + adj_BMC_turbine
         comb_j_cost = (comb_capital_cost / 3) + comb_utilities_cost
-        print(adj_BMC_air_comp, adj_BMC_fuel_comp, adj_BMC_turbine)
+        #print(adj_BMC_air_comp, adj_BMC_fuel_comp, adj_BMC_turbine)
         # NOx emissions
         ma = compressed_air_needed / 3600
-        fuel_mass_flow = (methane_feed_massflow + ethane_feed_massflow + ethene_feed_massflow + propane_feed_massflow + propene_feed_massflow + butane_feed_massflow) / 3600
+        fuel_mass_flow = (methane_feed_massflow + ethane_feed_massflow + ethene_feed_massflow + propane_feed_massflow
+                          + propene_feed_massflow + butane_feed_massflow) / 3600
         q = fuel_mass_flow / ma
         NOx_ppmv = 18.1 * (OP ** 1.42) * (ma ** 0.3) * (q ** 0.72)  # ppmv
         # ppm = ppmv * density of mixture / density of species

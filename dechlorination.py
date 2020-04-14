@@ -18,23 +18,26 @@ class DECH:
         k = A*math.exp(-Ea*(10**3)/(8.314*(self.dechtemp + 273.15))) #temp need to be in K
         X = 0.98  #constrain to ensure limited PVC in plastic waste
         self.residencetime = -((1-X)**(1-n))/((1-n)*k)
-        print(self.residencetime)
+        #print(self.residencetime)
         self.aspen.Engine.Run2()
 
         #to determine vessel sizing
-        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 962.4 #(kg/h to m3/h) #check if suppose to be the same as pyrolysis
-        print(pwastevolflow)
+        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 962.4 #(kg/h to m3/h)
+        # #check if suppose to be the same as pyrolysis
+        #print(pwastevolflow)
 
         #duty
         self.duty = self.aspen.Tree.FindNode(r"\Data\Blocks\DECH\Output\QNET").Value #cal/s
 
     def vesselcost(self):
-        Cp = math.exp(0.481996*(math.log(self.duty * 14.28595459)) + 6.19166) #CE index of 320 #cost based on rotary kiln
+        Cp = math.exp(0.481996*(math.log(self.duty * 14.28595459)) + 6.19166) #CE index of 320 #cost based on
+        # rotary kiln
         Cbm = Cp * 2.2 * self.CEindex/320
         return Cbm
 
     def dech_totalannualcost(self):
-        cost_of_heating = abs(self.duty) * 0.004184 * 0.070 * self.CEindex/381.1 * 24 * 330 # to approximate using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
+        cost_of_heating = abs(self.duty) * 0.004184 * 0.070 * self.CEindex/381.1 * 24 * 330 # to approximate using the
+        # electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
         Cbm = self.vesselcost()
         annualcost = Cbm + cost_of_heating
         #print(Cbm, cost_of_heating)

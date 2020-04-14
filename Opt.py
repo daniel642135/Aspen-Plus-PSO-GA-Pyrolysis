@@ -182,8 +182,10 @@ def optimiseseparation(pso_gen, ga):
 #optimiseseparation(pso_gen=2, ga=True)
 
 def optimiseall(pso_gen, ga):
+    data_store = []
     aspen = init_aspen()
     dech = DECH(aspen)
+    print("Connected")
     hclscrubber = HCL(aspen)
     pyrolysis = PYRO(aspen)
     sep = SEPARATE(aspen)
@@ -206,11 +208,12 @@ def optimiseall(pso_gen, ga):
     refluxmulti = [1.6, 3]
 
     #Combustion
-    pressure = [11, 13]
+    pressure = [15, 19]
     ER = [0.7, 0.8]
-    efficiency = [99, 99.99999999999999]
+    efficiency = [99.3, 99.8]
 
-    p_store = [inlettempdech, inlettemp, NAOHwaterflow, b_temp, b_residencetime, feedtemp, refluxmulti, pressure, ER, efficiency]
+    p_store = [inlettempdech, inlettemp, NAOHwaterflow, b_temp, b_residencetime, feedtemp, refluxmulti, pressure, ER,
+               efficiency]
 
     params = {'c1': 1.5, 'c2': 1.5, 'wmin': 0.4, 'wmax': 0.9,
               'ga_iter_min': 5, 'ga_iter_max': 20, 'iter_gamma': 10,
@@ -224,7 +227,8 @@ def optimiseall(pso_gen, ga):
     smin = [abs(x - y) * 0.01 for x, y in zip(pmin, pmax)]
     smax = [abs(x - y) * 0.5 for x, y in zip(pmin, pmax)]
 
-    dv = ['inlettempdech', 'inlettemp', 'NAOHwaterflow', 'b_temp', 'b_residencetime', 'feedtemp', 'refluxmulti', 'pressure', 'ER', 'efficiency']
+    dv = ['inlettempdech', 'inlettemp', 'NAOHwaterflow', 'b_temp', 'b_residencetime', 'feedtemp', 'refluxmulti',
+          'pressure', 'ER', 'efficiency']
 
     def func(individual):
         nonlocal dech
@@ -233,47 +237,102 @@ def optimiseall(pso_gen, ga):
         nonlocal sep
         nonlocal comb
 
-        inlettempdech, inlettemp, NAOHwaterflow, b_temp, b_residencetime, feedtemp, refluxmulti, pressure, ER, efficiency = individual
 
+        data_store_column = ['inlettempdech', 'inlettemp', 'NAOHwaterflow', 'b_temp', 'b_residencetime', 'feedtemp',
+                             'refluxmulti', 'pressure', 'ER', 'efficiency', 'dechcap', 'hclcap', 'pyrocap', 'sepcap',
+                             'combcap', 'dechU', 'hclU', 'pyroU', 'sepU', 'combU', 'rawmaterial1', 'rawmaterial2',
+                             'revenue', 'annualisedcapcost', 'Tutility', 'dieselflow', 'gasolineflow', 'turbine_power', 'annualisedprofit', 'nonconverge', 'HCLppm', 'L', 'ID' , 'L/ID',
+                             'D_int', 'CO_ppm', 'NOx_ppm', 'W', 'Csb', 'objective']
+        def save_data_store(data):
+            with open('data_store.pkl','wb') as handle:
+                pickle.dump([data_store_column, data], handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        inlettempdech, inlettemp, NAOHwaterflow, b_temp, b_residencetime, feedtemp, refluxmulti, pressure, ER,\
+        efficiency = individual
+        # print("DVs values... ...")
+        # print(inlettempdech, inlettemp, NAOHwaterflow, b_temp, b_residencetime, feedtemp, refluxmulti, pressure, ER,
+        #       efficiency)
         dech.solve_dech(reactortemp=inlettempdech, )
         HCLppm = hclscrubber.solve_hcl(inlettemp=inlettemp, NAOHwaterflow=NAOHwaterflow, )
         pyrolysis.solve_pyro(reactortemp=b_temp, residencetime=b_residencetime, )
-        ID, L, dieselflow, gasolineflow, Csb = sep.sep_solve(feedtemp=feedtemp, refluxmulti=refluxmulti, )
-        Cbm5, utility5, D_int, NOx_ppm, CO_ppm, turbine_power = comb.combustionsolve(OP=pressure, OER=ER, eff=efficiency, )
+        L, ID, dieselflow, gasolineflow, Csb, nonconverge = sep.sep_solve(feedtemp=feedtemp, refluxmulti=refluxmulti, )
 
-        Cbm1, utility1 = dech.dech_totalannualcost()
-        Cbm2, utility2, rawmaterial1 = hclscrubber.hcl_totalannualcost()
-        Cbm3, utility3, rawmaterial2 = pyrolysis.pyro_totalannualcost()
-        Cbm4, utility4, W = sep.totalcost()
+        if nonconverge == True:
+            objective = 1e10
+            annualisedprofit = -1
+            Cbm1 = -1
+            Cbm2 = -1
+            Cbm3 = -1
+            Cbm4 = -1
+            Cbm5 = -1
+            utility1 = -1
+            utility2 = -1
+            utility3 = -1
+            utility4 = -1
+            utility5 = -1
+            rawmaterial1 = -1
+            rawmaterial2 = -1
+            revenue = -1
+            annualisedcapcost = -1
+            Tutility = -1
+            D_int = -1
+            CO_ppm = -1
+            NOx_ppm = -1
+            W = -1
+            turbine_power = -1
+        else:
+            Cbm5, utility5, D_int, NOx_ppm, CO_ppm, turbine_power = comb.combustionsolve(OP=pressure, OER=ER,
+                                                                                         eff=efficiency, )
+
+            Cbm1, utility1 = dech.dech_totalannualcost()
+            Cbm2, utility2, rawmaterial1 = hclscrubber.hcl_totalannualcost()
+            Cbm3, utility3, rawmaterial2 = pyrolysis.pyro_totalannualcost()
+            Cbm4, utility4, W, nonconverge = sep.totalcost()
 
 
-        TCbm = Cbm1 + Cbm2 + Cbm3 + Cbm4 + Cbm5 + 3000000 #add $3m from capital cost of HX
-        Tutility = utility1 + utility2 + utility3 + utility4 + utility5
-        Trawmaterial = rawmaterial1 + rawmaterial2
+            TCbm = Cbm1 + Cbm2 + Cbm3 + Cbm4 + Cbm5 + 3000000 #add $3m from capital cost of HX
+            Tutility = utility1 + utility2 + utility3 + utility4 + utility5
+            Trawmaterial = rawmaterial1 + rawmaterial2
 
-        TCI = 5.03 * TCbm
-        annualisedcapcost = TCI * ((0.05)*(1.05)**7 / ((1.05)**7 - 1)) # 5% interest rate for 7 years
+            TCI = 5.03 * TCbm
+            annualisedcapcost = TCI * ((0.05)*(1.05)**7 / ((1.05)**7 - 1)) # 5% interest rate for 7 years
 
-        revenue = (dieselflow*0.75 + gasolineflow*0.98)*60*24*330 + (turbine_power * 0.070 * 603.1/381.1 * 24 * 330)
-        annualisedprofit = revenue - annualisedcapcost - Tutility - Trawmaterial
+            revenue = (dieselflow*0.75 + gasolineflow*0.98)*60*24*330 + (abs(turbine_power)
+                                                                         * 0.070 * 603.1/381.1 * 24 * 330)
+            annualisedprofit = revenue - annualisedcapcost - Tutility - Trawmaterial
 
-        objective = annualisedprofit
 
-        #constraints
-        if HCLppm > 85:
-            objective = 1e20
-        if L/ID > 20:
-            objective = 1e20
-        if D_int <= 0:
-            objective = 1e20
-        if CO_ppm > 0.00011:
-            objective = 1e20
-        if NOx_ppm > 200:
-            objective = 1e20
-        if W < 4200:
-            objective = 1e20
-        if Csb == 0.4:
-            objective = 1e20
+            if annualisedprofit < 0:
+                objective = 1e10
+            else:
+                objective = -annualisedprofit #we are minimising it
+
+            #constraints
+            if nonconverge == True:
+                objective = 1e10
+            if HCLppm > 85:
+                objective = 1e10
+            if L/ID > 20:
+                objective = 1e10
+            if D_int <= 0:
+                objective = 1e10
+            if CO_ppm > 0.00011:
+                objective = 1e10
+            if NOx_ppm > 200:
+                objective = 1e10
+            if W < 4200:
+                objective = 1e10
+            if Csb == -1:
+                objective = 1e10
+
+        data = [inlettempdech, inlettemp, NAOHwaterflow, b_temp, b_residencetime, feedtemp, refluxmulti, pressure, ER,
+                efficiency, Cbm1, Cbm2, Cbm3, Cbm4, Cbm5, utility1, utility2, utility3, utility4, utility5,
+                rawmaterial1, rawmaterial2, revenue, annualisedcapcost, Tutility, dieselflow, gasolineflow,
+                turbine_power, annualisedprofit, nonconverge, HCLppm, L, ID, L/ID, D_int, CO_ppm, NOx_ppm, W,
+                Csb, objective]
+
+        data_store.append(data)
+        save_data_store(data_store)
 
         return (objective,)
 
@@ -282,4 +341,18 @@ def optimiseall(pso_gen, ga):
                                 int_idx=None, params=params, ga=ga, dv=dv)
     return best
 
-optimiseall(pso_gen=1, ga=True)
+
+
+def readfile(name):
+    with open('./data_store.pkl', 'rb') as handle:
+        data_store = pickle.load(handle)
+
+    write_excel = create_excel_file('./results/{}_results.xlsx'.format(name))
+    wb = openpyxl.load_workbook(write_excel)
+    ws = wb[wb.sheetnames[-1]]
+    print_df_to_excel(df=pd.DataFrame(data=data_store[1], columns=data_store[0]), ws=ws)
+    wb.save(write_excel)
+
+
+#optimiseall(pso_gen=20, ga=True)
+readfile(name='fullevalresult')

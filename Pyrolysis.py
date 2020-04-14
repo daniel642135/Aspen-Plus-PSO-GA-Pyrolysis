@@ -23,7 +23,7 @@ class PYRO:
         Re1 = (k1 ** 2 + k2 * Ar1) ** 0.5 - k1
         Re4 = (k1 ** 2 + k2 * Ar4) ** 0.5 - k1
         Umf1 = Re1 * viscosityofN2 / (densityofN2 * 0.001)
-        Umf4 = Re4 * viscosityofN2 / (densityofN2 * 0.004)
+        #Umf4 = Re4 * viscosityofN2 / (densityofN2 * 0.004)
         meanUmf = Umf1 * 3600 #m/hr
 
         pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 962.4  # (kg/h to m3/h) #check if this is correct
@@ -47,14 +47,14 @@ class PYRO:
             #L = ID * 2
 
             area = ((ID * 0.0254) ** 2) * math.pi / 4  # m2
-            print(N2volflow, area, voidfraction, reactorvol, ID, L)
+            #print(N2volflow, area, voidfraction, reactorvol, ID, L)
             return (area, ID, L)
 
         N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06  # (l/min to m3/h) this value should be fixed due to the determination of fluidizing flow based on the fixed input plastic waste
-        print(N2volflow)
+        #print(N2volflow)
         area, ID, L = itrarea(N2volflow)
         U = N2volflow / area # m/h
-        print(U)
+        #print(U)
         diff = 10
         while diff > 0.001:
             N2volflow = area * meanUmf
@@ -65,8 +65,8 @@ class PYRO:
         self.ID = ID
         self.L = L
         self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Input\FLOW\MIXED\NITROGEN").Value = U * area * densityofN2 #kg/hr
-        print(area)
-        print("mass flow of n2 = " + str(U * area * densityofN2))
+        # print(area)
+        # print("mass flow of n2 = " + str(U * area * densityofN2))
         self.N2flow = U * area
         #DV
         self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\TEMP").Value = reactortemp #change the temp of the reactor
@@ -94,11 +94,11 @@ class PYRO:
         self.totalconversion = totalconversion
         self.aspen.Engine.Run2()
 
-        print("L = " + str(self.L))
-        print("ID = " + str(self.ID))
-        print("U = " + str(U))
-        print("Umf = " + str(meanUmf))
-        print("conversion = " + str(totalconversion))
+        # print("L = " + str(self.L))
+        # print("ID = " + str(self.ID))
+        # print("U = " + str(U))
+        # print("Umf = " + str(meanUmf))
+        # print("conversion = " + str(totalconversion))
 
 
         #energy requirement
@@ -217,8 +217,8 @@ class PYRO:
         cost_of_heating = abs(self.duty) * 0.004184 * 0.070 * self.CEindex/381.1 * 24 * 330 # to approximate using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
         Cbm = self.vesselcost(self.L, self.ID, Po=0, To=self.reactortemp, corr=False, internal=False, stage=0)
         N2 = self.N2flow * 24 * 330 * 0.65  # convert m3/hr to m3/yr, with the price of 0.65 per m3
-        print("Cbm = " + str(Cbm))
-        print("cost_of_heating = " + str(cost_of_heating))
+        # print("Cbm = " + str(Cbm))
+        # print("cost_of_heating = " + str(cost_of_heating))
         Jcost = Cbm/3 + cost_of_heating
         return Cbm, cost_of_heating, N2
 
