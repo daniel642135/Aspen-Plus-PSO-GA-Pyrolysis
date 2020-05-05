@@ -19,14 +19,12 @@ class PYRO:
         densityofN2 = 0.437  # kg/m3 based on 500 oC
         viscosityofN2 = 3.49 * 10 ** -5  # Pa-s based on 500 oC
         Ar1 = (0.001 ** 3) * densityofN2 * (962.4 - densityofN2) * 9.81 / (viscosityofN2 ** 2)
-        Ar4 = (0.004 ** 3) * densityofN2 * (962.4 - densityofN2) * 9.81 / (viscosityofN2 ** 2)
         Re1 = (k1 ** 2 + k2 * Ar1) ** 0.5 - k1
-        Re4 = (k1 ** 2 + k2 * Ar4) ** 0.5 - k1
         Umf1 = Re1 * viscosityofN2 / (densityofN2 * 0.001)
-        #Umf4 = Re4 * viscosityofN2 / (densityofN2 * 0.004)
         meanUmf = Umf1 * 3600 #m/hr
 
-        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 962.4  # (kg/h to m3/h) #check if this is correct
+        pwastevolflow = self.aspen.Tree.FindNode(r"\Data\Streams\PWASTE\Input\TOTFLOW\NC").Value / 962.4
+        # (kg/h to m3/h) #check if this is correct
         # to determine vessel sizing
         # initial guess from base case
 
@@ -50,23 +48,38 @@ class PYRO:
             #print(N2volflow, area, voidfraction, reactorvol, ID, L)
             return (area, ID, L)
 
-        N2volflow = self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Output\RES_VOLFLOW").Value * 0.06  # (l/min to m3/h) this value should be fixed due to the determination of fluidizing flow based on the fixed input plastic waste
-        #print(N2volflow)
+        #initial guess
+        N2volflow = 12504.9 * 0.06  # (l/min to m3/h)
         area, ID, L = itrarea(N2volflow)
         U = N2volflow / area # m/h
-        #print(U)
-        diff = 10
-        while diff > 0.001:
-            N2volflow = area * meanUmf
-            area, ID, L = itrarea(N2volflow)
-            U = N2volflow / area
-            diff = abs(U - meanUmf)
 
-        self.ID = ID
-        self.L = L
-        self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Input\FLOW\MIXED\NITROGEN").Value = U * area * densityofN2 #kg/hr
-        # print(area)
-        # print("mass flow of n2 = " + str(U * area * densityofN2))
+        if U < meanUmf:
+            if U - meanUmf < 0.001:
+                self.ID = ID
+                self.L = L
+            else:
+                U = meanUmf * 0.8
+                diff = 10
+                while diff > 0.001:
+                    N2volflow = area * meanUmf
+                    area, ID, L = itrarea(N2volflow)
+                    U = N2volflow / area
+                    diff = abs(U - meanUmf)
+                self.ID = ID
+                self.L = L
+        else:
+            diff = 10
+            while diff > 0.001:
+                N2volflow = area * meanUmf
+                area, ID, L = itrarea(N2volflow)
+                U = N2volflow / area
+                diff = abs(U - meanUmf)
+            self.ID = ID
+            self.L = L
+
+        self.aspen.Tree.FindNode(r"\Data\Streams\N2FLUID\Input\FLOW\MIXED\NITROGEN").Value = U * area * densityofN2
+        #kg/hr
+
         self.N2flow = U * area
         #DV
         self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\TEMP").Value = reactortemp #change the temp of the reactor
@@ -93,13 +106,6 @@ class PYRO:
         self.aspen.Tree.FindNode(r"\Data\Blocks\PYRO\Input\CONV\6").Value = totalconversion
         self.totalconversion = totalconversion
         self.aspen.Engine.Run2()
-
-        # print("L = " + str(self.L))
-        # print("ID = " + str(self.ID))
-        # print("U = " + str(U))
-        # print("Umf = " + str(meanUmf))
-        # print("conversion = " + str(totalconversion))
-
 
         #energy requirement
         self.duty = self.aspen.Tree.FindNode("\Data\Blocks\PYRO\Output\QNET").Value #cal/s
@@ -192,7 +198,8 @@ class PYRO:
 
         W = math.pi * (ID + ts) * (L + 0.8 * ID) * ts * density
 
-        Cv = math.exp(7.1390 + 0.18255 * (math.log(W)) + 0.02297 * (math.log(W)) ** 2)  # CE index = 567 (2013)  # 4200< W < 1,000,000 lb
+        Cv = math.exp(7.1390 + 0.18255 * (math.log(W)) + 0.02297 * (math.log(W)) ** 2)
+        # CE index = 567 (2013)  # 4200< W < 1,000,000 lb
         Cpl = 410 * ((ID / 12) ** 0.7396) * ((L / 12) ** 0.70684)  # 3 < ID < 21 ft and 12 < L < 40 ft
 
         if internal:
@@ -214,21 +221,12 @@ class PYRO:
         return Cbm
 
     def pyro_totalannualcost(self):
-        cost_of_heating = abs(self.duty) * 0.004184 * 0.070 * self.CEindex/381.1 * 24 * 330 # to approximate using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
+        cost_of_heating = abs(self.duty) * 0.004184 * 0.070 * self.CEindex/381.1 * 24 * 340
+        # to approximate using the electricity cost given in seider ($0.070/kW-hr) in 1995 price CE index 381.1
         Cbm = self.vesselcost(self.L, self.ID, Po=0, To=self.reactortemp, corr=False, internal=False, stage=0)
-        N2 = self.N2flow * 24 * 330 * 0.65  # convert m3/hr to m3/yr, with the price of 0.65 per m3
-        # print("Cbm = " + str(Cbm))
-        # print("cost_of_heating = " + str(cost_of_heating))
-        Jcost = Cbm/3 + cost_of_heating
+        N2 = self.N2flow * 24 * 340 * 0.65  # convert m3/hr to m3/yr, with the price of 0.65 per m3
         return Cbm, cost_of_heating, N2
 
-    def pyro_result(self):
-        annual_cost = self.pyro_totalannualcost()
-        objective = annual_cost/self.totalconversion
-
-        # Constraint
-
-        return objective
 
 
 

@@ -26,7 +26,8 @@ def heat_exchanger_sizing(Thi,Tho,Tci,Tco,Q,dext,dint,hsf,htf,REs,Prs,ks,REt,Prt
     U = 1/invU
     A = UA/U
     number_of_tubes = A/(tubes_length*3.14*dint)
-    return {'UA':UA,'U':U, 'A':A, 'Ft' : Ft, 'LMTD': LMTempDiff, 'Shell number': N,'Number of tubes': number_of_tubes, 'tubes_length':tubes_length}
+    return {'UA':UA,'U':U, 'A':A, 'Ft' : Ft, 'LMTD': LMTempDiff, 'Shell number': N,'Number of tubes': number_of_tubes,
+            'tubes_length':tubes_length}
 
 def heat_exchanger_sizing2(Thi,Tho,Tci,Tco,Q,dint,N_tubes,U):
     R = (Thi - Tho) / (Tco - Tci)
@@ -43,7 +44,8 @@ def heat_exchanger_sizing2(Thi,Tho,Tci,Tco,Q,dint,N_tubes,U):
     UA = Q/(Ft*LMTempDiff)
     A = UA/U
     tubes_length = A/(N_tubes*3.14*dint)
-    return {'UA':UA, 'U':U, 'A':A, 'Ft' : Ft, 'LMTD': LMTempDiff, 'Shell number': N,'Number of tubes': N_tubes, 'tubes_length':tubes_length}
+    return {'UA':UA, 'U':U, 'A':A, 'Ft' : Ft, 'LMTD': LMTempDiff, 'Shell number': N,'Number of tubes': N_tubes,
+            'tubes_length':tubes_length}
 
 def heat_exchanger_costs(resultsdict, shell_side_pressure, MOC_factor_a, MOC_factor_b, hX_type):
     area_in_ft2 = resultsdict['A']
@@ -149,7 +151,8 @@ results1 = heat_exchanger_sizing(Thi = Thi,# F
                       k= 9.251,#Btu/h-ft-F
                         tubes_length = length_of_tubes)  #ft
 
-results2 = heat_exchanger_costs (resultsdict=results1,shell_side_pressure= 14.7 ,MOC_factor_a = 0,MOC_factor_b=0,hX_type='Floating head')
+results2 = heat_exchanger_costs (resultsdict=results1,shell_side_pressure= 14.7 ,MOC_factor_a = 0,MOC_factor_b=0,
+                                 hX_type='Floating head')
 results3 = results2
 if results3['Number of tubes'] <= 20:
     results3['Number of tubes'] = 20
@@ -169,7 +172,9 @@ else:
     print('error!!!')
 results3['A'] = length_of_tubes * results2['Number of tubes'] *3.14 * dint_ft
 results3['U'] = results2['UA']/results2['A']
-results4 = heat_exchanger_sizing2(Thi =Thi, Tho=Tho, Tci=Tci, Tco=Tco, Q=10639718, dint=dint_ft, N_tubes=results3['Number of tubes'], U=results3['U'])
-results5 = heat_exchanger_costs(resultsdict=results4,shell_side_pressure= 14.7 ,MOC_factor_a = 0,MOC_factor_b=0,hX_type='Floating head')
+results4 = heat_exchanger_sizing2(Thi =Thi, Tho=Tho, Tci=Tci, Tco=Tco, Q=10639718, dint=dint_ft,
+                                  N_tubes=results3['Number of tubes'], U=results3['U'])
+results5 = heat_exchanger_costs(resultsdict=results4,shell_side_pressure= 14.7 ,MOC_factor_a = 0,MOC_factor_b=0,
+                                hX_type='Floating head')
 results5['tube velocity'] = average_volumetric_flow_rate/(results5['Number of tubes']*((dint_m**2)*(3.14/4)))
 # print(results5)

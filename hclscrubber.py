@@ -60,7 +60,7 @@ class HCL:
         self.numofstage = N
         self.numofstage2 = N
         self.numoftrays = N
-        #print(N)
+
         #run aspen
         self.aspen.Engine.Run2()
 
@@ -199,7 +199,7 @@ class HCL:
             ts = n * 0.25
 
         W = math.pi * (ID + ts) * (L + 0.8 * ID) * ts * density
-        #print(W)
+        print(W)
         if W < 4200:
             W = 4200
         Cv = math.exp(7.1390 + 0.18255 * (math.log(W)) + 0.02297 * (math.log(W)) ** 2)
@@ -225,29 +225,18 @@ class HCL:
         return Cbm
 
     def hcl_totalannualcost(self):
-        cost_of_cooling = (self.cooler1 + self.cooler2 + self.cooler3) *4.184 * 10**-6 * 3600 * 24 * 330 * 0.354
+        cost_of_cooling = (self.cooler1 + self.cooler2 + self.cooler3) * 4.184 * 10**-9 * 3600 * 24 * 340 * 0.354
         # using the cooling water given in Turton ($0.354/GJ) # convert from cal/s to GJ/s To consider that that
         # can be considered as current price
         Cbm = self.vesselcost(self.L, self.ID, Po=0, To=self.scrubbertemp, corr=True, internal=True,
                               stage=self.numoftrays)
         #raw material cost
-        N2 = self.N2volflowrate * 0.001 * 60 * 24 * 330 * 0.65 #convert l/min to m3/yr, with the price of 0.65 per m3
-        NaOH = self.massofNaOH * 24 * 330 * 0.49 #convert to $/year for 0.49/kg
-        water = self.volofwater * 24 * 330 * 0.48 #convert to $/year for 0.48/kg
+        N2 = self.N2volflowrate * 0.001 * 60 * 24 * 340 * 0.65 #convert l/min to m3/yr, with the price of 0.65 per m3
+        NaOH = self.massofNaOH * 24 * 340 * 0.49 #convert to $/year for 0.49/kg
+        water = self.volofwater * 24 * 340 * 0.48 #convert to $/year for 0.48/kg
         rawmaterialcost = N2 + NaOH + water
-        annualcost = (Cbm/3) + (cost_of_cooling) + rawmaterialcost #consider per year #need to add raw material cost
-        #print(Cbm, cost_of_cooling, rawmaterialcost)
+
         return Cbm, cost_of_cooling, rawmaterialcost
 
 
-    def hcl_result(self):
-        annualcost = self.hcl_totalannualcost()
-        objective = annualcost
-        #print("totalcost = "+str(objective))
-
-        # Constraint
-        if self.HCLppm > 85:    #to check on the discharge limit of HCL
-            objective = 1e20
-
-        return objective
 

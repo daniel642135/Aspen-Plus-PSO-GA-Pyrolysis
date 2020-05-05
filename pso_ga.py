@@ -21,7 +21,8 @@ def generate_part(dim, pmin, pmax, smin, smax, int_idx):
             int_mask[i] = 1
     except TypeError:
         pass  # If int_idx is None, then int_mask will be all 0
-    position = [random.uniform(pmin[idx], pmax[idx])if int_mask[idx]==0 else random.randint(pmin[idx], pmax[idx]) for idx in range(dim)]
+    position = [random.uniform(pmin[idx], pmax[idx])if int_mask[idx]==0 else random.randint(pmin[idx], pmax[idx])
+                for idx in range(dim)]
     part = creator.Particle(position)
     part.int_mask = int_mask
     part.speed = [random.uniform(smin[idx], smax[idx]) for idx in range(dim)]
@@ -126,7 +127,8 @@ def pso_ga(func, pmin, pmax, smin, smax, int_idx, params, ga, dv):
                    smin=None, smax=None, best=None, int_idx=None)
 
     toolbox = base.Toolbox()
-    toolbox.register("particle", generate_part, dim=len(pmin), pmin=pmin, pmax=pmax, smin=smin, smax=smax, int_idx=int_idx)
+    toolbox.register("particle", generate_part, dim=len(pmin), pmin=pmin, pmax=pmax, smin=smin, smax=smax,
+                     int_idx=int_idx)
     toolbox.register("population", tools.initRepeat, list, toolbox.particle)
     toolbox.register("update", updateParticle, c1=c1, c2=c2)
     toolbox.register("evaluate", func)

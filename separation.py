@@ -83,8 +83,6 @@ class SEPARATE:
         self.ID3 = 0.9144*39.3701 #convert from m to inch
         self.temp3 = self.aspen.Tree.FindNode(r"\Data\Blocks\B5\Input\TEMP").Value
 
-        self.count = 0
-
     def sep_solve(self, feedtemp, refluxmulti):
         self.aspen.Tree.FindNode(r"\Data\Blocks\LIQHEAT\Input\TEMP").Value = feedtemp
         self.reboilertemp = feedtemp
@@ -101,23 +99,12 @@ class SEPARATE:
         self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_RR").Value = \
             self.aspen.Tree.FindNode("\Data\Blocks\B6\Output\ACT_REFLUX").Value
         self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\DP_COL").Value = 5
-        #pressure drop across column is 5 psi, maybe can change to dependent on number of stages
-        #self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\DP_STAGE").Value = 0.1 #pressure drop per stage
         self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\FEED_STAGE\LIQAFHE2").Value = feedtray
         self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\NSTAGE").Value = stages
         #number of stages includes condenser and reboiler
         self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\PROD_STAGE\HEAVYACT").Value = stages
-        #print(feedtemp, refluxmulti, feedtray, stages)
-        # print(self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_D").Value,
-        #       self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_RR").Value,
-        #       self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\FEED_STAGE\LIQAFHE2").Value,
-        #       self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\NSTAGE").Value,
-        #       self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\PROD_STAGE\HEAVYACT").Value)
-        # to make sure that the pump of the feed is higher than the feed tray pressure
         self.aspen.Engine.Run2()
 
-        self.count += 1
-        #print(self.count)
         if self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\BU_RATIO").Value == None:
             nonconverge = True
             L4 = -1
@@ -169,21 +156,6 @@ class SEPARATE:
                       0.0610237) ** 0.5  # convert to in
                 return ID, Csb
 
-            #given that the feed can be saturated liquid or saturated vapour, need to check top and bottom sides
-
-            #distflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\MASS_D").Value
-            #botflow = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\MASS_B").Value
-            # distflow = self.aspen.Tree.FindNode(r"\Data\Streams\LIGHTACT\Output\MASSFLMX\MIXED").Value
-            # botflow = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\MASSFLMX\MIXED").Value
-            # RR = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Input\BASIS_RR").Value
-            # VN = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\MASS_VN").Value
-            # TopV = distflow*(1+RR)
-            # TopL = TopV - distflow
-            # BotV = VN
-            # BotL = VN + botflow
-            #Application.Tree.FindNode("\Data\Blocks\B7\Output\BU_RATIO")
-
-
             TopV = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\VAP_FLOW\2").Value
             TopL = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\LIQ_FLOW\2").Value
             BotV = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\VAP_FLOW\\' + str(stages-1)).Value
@@ -220,9 +192,6 @@ class SEPARATE:
             feedpressure = self.aspen.Tree.FindNode('\Data\Blocks\B7\Output\B_PRES\\' + str(feedtray)).Value
             #Feed pressure
             feedpressure = round_up(feedpressure, 2)
-            # print("height = " + str(L4), "diameter = " + str(ID4), "stage = " + str(stages), "feed stage = "
-            #       + str(feedtray), "feed pressure = " + str(feedpressure), "reflux = " +
-            #       str(self.aspen.Tree.FindNode("\Data\Blocks\B6\Output\ACT_REFLUX").Value))
             self.temp4 = self.aspen.Tree.FindNode("\Data\Blocks\B7\Output\BOTTOM_TEMP").Value #oC
             pressure = self.aspen.Tree.FindNode(r"\Data\Streams\HEAVYACT\Output\PRES_OUT\MIXED").Value #bar
             self.pressure = (pressure * 14.5038) - 14.6959 #psig
@@ -278,7 +247,7 @@ class SEPARATE:
                                self.aspen.Tree.FindNode(r"\Data\Blocks\VAPC3\Output\QNET").Value +
                                self.aspen.Tree.FindNode(r"\Data\Blocks\VAPC4\Output\QNET").Value +
                                self.aspen.Tree.FindNode(r"\Data\Blocks\VAPC5\Output\QNET").Value)
-        pyrovapourcoolercost = totalcoolingduty *4.184 * 10**-9 * 3600 * 24 * 330 * 0.378
+        pyrovapourcoolercost = totalcoolingduty * 4.184 * 10**-9 * 3600 * 24 * 340 * 0.378
         # using the cooling water given in Turton ($0.378/GJ) # convert from cal/s to GJ/s To consider
         # that that can be considered as current price
 
@@ -288,12 +257,12 @@ class SEPARATE:
         a = 0.5*(Q**(-0.9))*(T**(-3))
         b = 1.1*(10**6)*(T**(-5))
         Cu = a*CEindex + b*Cf #$/kJ
-        refrigerantcoolercost = Cu * Q * 3600 * 24 * 330
-        #print(T, Q, a, b, Cu, refrigerantcoolercost)
+        refrigerantcoolercost = Cu * Q * 3600 * 24 * 340
+
         #pump utility cost
         #make sure to run capital cost first before utility cost function or the self variable will not be updated
         electricost = 0.00013*CEindex + 0.01*Cf #$/kwh
-        pumpcost = self.Pc * 0.7457 * 31.5 * 10**6 * electricost / 3600 /365 * 330 #$/year
+        pumpcost = self.Pc * 0.7457 * 31.5 * 10**6 * electricost / 3600 /365 * 340 #$/year
 
         def reboiler(duty, steamtempin, pressure):
             CEindex = 603.1
@@ -305,7 +274,7 @@ class SEPARATE:
             a = 2.3 * 10 ** -5 * steamcapacity ** -0.9
             b = 0.0034 * pressure ** 0.05
             process_steam = a * CEindex + b * 6 #Cf is $6/GJ
-            reboilercost = steamcapacity*31.5*10**6*process_steam/365*330 #check the formula here
+            reboilercost = steamcapacity*31.5*10**6*process_steam/365*340
 
             return reboilercost
 
@@ -336,8 +305,8 @@ class SEPARATE:
             Q2 = self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\REB_DUTY").Value * 0.00396567
             # convert from cal/s to Btu/s
             #for 70% efficiency
-            natgas = Q2/0.7/1050 * 3600 * 24 * 330 # SCF/yr
-            reboilercost2 = natgas * 5/1000 * CEindex/381.1 #$5/1000 SCF in 1995 price
+            natgas = Q2/0.7/1050 * 3600 * 24 * 340 # SCF/yr
+            reboilercost2 = natgas * 0.0283168 * 0.71 * 0.51289615 #based on thailand NGV 2019 price
 
         #Distillation column cooler using cooling water
         if self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\COND_DUTY").Value == None:
@@ -347,22 +316,14 @@ class SEPARATE:
             nonconverge = False
             Q3 = abs(self.aspen.Tree.FindNode(r"\Data\Blocks\B7\Output\COND_DUTY").Value) * 15.0624
             # convert from cal/s to kJ/hr
-            Tin3 = 25 #oC
-            Tout3 = 49 #oC
-            CWmolarenthalpy = 75.4*(10**-3)*(Tout3-Tin3)*1000 #kJ/kmol
-            CWmassenthalpy = CWmolarenthalpy / 18.02 #kJ/kg
-            CWcapacity = Q3 / CWmassenthalpy / 1002 / 3600 #m3/s #at the lower limit of the correlation
-            if CWcapacity < 0.01:
-                CWcapacity = 0.01
-            a2 = 0.00007 + 2.5 * (10 ** -5) * CWcapacity ** -1
-            b2 = 0.003
-            process_cw = a2 * CEindex + b2 * 6 #Cf is $6/GJ
-            condensercost = CWcapacity*31.5*10**6*process_cw/365*330
+            condensercost = Q3 * 4.184 * 10**-9 * 3600 * 24 * 340 * 0.378
+        # using the cooling water given in Turton ($0.378/GJ) # convert from cal/s to GJ/s To consider
+        # that that can be considered as current price
 
         #get total cost for utility
         totalseparationutilitycost = pyrovapourcoolercost + refrigerantcoolercost + pumpcost + reboilercost1 + \
                                      reboilercost2 + condensercost
-        #print(pyrovapourcoolercost, refrigerantcoolercost, pumpcost, reboilercost1, reboilercost2, condensercost)
+        # print(pyrovapourcoolercost, refrigerantcoolercost, pumpcost, reboilercost1, reboilercost2, condensercost)
         return totalseparationutilitycost, nonconverge
 
     def vesselcost(self, L, ID, Po, To, corr, internal, stage):  # corr is boolean
@@ -587,7 +548,6 @@ class SEPARATE:
 
         return Cbm, W
 
-
     def totalcost(self):
         S1capitalcost = self.vesselcost(self.L1, self.ID1, Po=0, To=self.temp1, corr=False, internal=False, stage=0)
         S2capitalcost = self.vesselcost(self.L2, self.ID2, Po=0, To=self.temp2, corr=False, internal=False, stage=0)
@@ -598,18 +558,4 @@ class SEPARATE:
         pumpcapitalcost = self.pump()
         utilitycost, nonconverge = self.utilitycost()
         Cbm = S1capitalcost + S2capitalcost + S3capitalcost + S4capitalcost + cyclonecapticalcost + pumpcapitalcost
-        totalcost = (S1capitalcost + S2capitalcost + S3capitalcost + S4capitalcost + cyclonecapticalcost +
-                     pumpcapitalcost)/3 + utilitycost
-        # print(S1capitalcost, S2capitalcost, S3capitalcost, S4capitalcost, cyclonecapticalcost, pumpcapitalcost,
-        #       utilitycost)
-        # print(totalcost)
         return Cbm, utilitycost, W, nonconverge
-    def sep_result(self):
-        Jcost = self.totalcost()
-        objective = Jcost
-
-        #constraint
-        if self.L4/self.ID4 > 20:
-            objective = 1e20
-
-        return objective
